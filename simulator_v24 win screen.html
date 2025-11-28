@@ -1,0 +1,2485 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Formyrmex ruforuber: Simulátor Kolonie v24</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&family=Signika:wght@600&display=swap');
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #222;
+            font-family: 'Signika', sans-serif;
+            color: white;
+            user-select: none;
+            font-size: 14px;
+            /* Zamezení zoomování na iOS při dvojkliku */
+            touch-action: manipulation;
+        }
+
+        #game-canvas {
+            display: block;
+            cursor: crosshair;
+        }
+
+        /* UI Overlay Styling */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        /* Custom Tooltip */
+        #custom-tooltip {
+            position: absolute;
+            display: none;
+            background: rgba(10, 10, 10, 0.98);
+            border: 1px solid #d35400;
+            padding: 10px;
+            border-radius: 6px;
+            pointer-events: none;
+            z-index: 2000;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 11px;
+            color: #fff;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.6);
+            min-width: 200px;
+        }
+
+        /* Styles for Tooltip Bars */
+        .tt-header { color: #d35400; font-weight: bold; border-bottom: 1px solid #444; margin-bottom: 6px; padding-bottom: 2px; font-size: 1.1em; }
+        .tt-desc { font-style: italic; color: #aaa; margin-bottom: 8px; font-size: 0.9em; }
+        .tt-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px; }
+        .tt-label { width: 60px; color: #ccc; }
+        .tt-bar-track { flex-grow: 1; height: 6px; background: #333; margin: 0 8px; border-radius: 3px; overflow: hidden; border: 1px solid #555; }
+        .tt-bar-fill { height: 100%; }
+        .tt-val { width: 35px; text-align: right; font-weight: bold; }
+
+        .panel {
+            pointer-events: auto;
+            background: rgba(0, 0, 0, 0.85);
+            border: 2px solid #8b4513;
+            border-radius: 6px;
+            padding: 8px;
+            margin-bottom: 8px; 
+            backdrop-filter: blur(2px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            transition: height 0.3s, opacity 0.3s;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #555;
+            padding-bottom: 4px;
+            margin-bottom: 8px;
+            cursor: pointer;
+        }
+        
+        .panel-header h3 { margin: 0; padding: 0; border: none; font-size: 0.95em; }
+
+        .minimize-btn {
+            background: none; border: 1px solid #555; color: #aaa;
+            width: 18px; height: 18px; line-height: 16px; text-align: center;
+            border-radius: 3px; cursor: pointer; font-family: monospace; font-size: 0.9em;
+        }
+        .minimize-btn:hover { background: #444; color: white; }
+
+        .panel.minimized { height: 28px !important; padding-bottom: 0; }
+        .panel.minimized .panel-content { display: none; }
+
+        /* Top Buttons & Stats */
+        #top-buttons { position: absolute; top: 10px; right: 10px; display: flex; gap: 10px; z-index: 20; pointer-events: auto; }
+
+        #stats-bar {
+            position: absolute; top: 0; left: 0; right: 0; 
+            display: flex; justify-content: flex-start; gap: 15px;
+            padding-left: 15px; padding-right: 150px; 
+            align-items: center; height: 50px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.95), rgba(0,0,0,0));
+            border: none; z-index: 10; pointer-events: none; 
+        }
+
+        .resource-group { display: flex; flex-direction: column; align-items: center; min-width: 45px; cursor: help; pointer-events: auto; }
+        .res-icon { font-size: 0.9em; margin-bottom: 1px; }
+        .res-text { font-family: 'Roboto Mono', monospace; font-size: 9px; color: #ccc; margin-top: 2px; line-height: 1; }
+        #val-time { font-size: 11px; color: #fff !important; font-weight: bold; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000; }
+        .bar-container { width: 60px; height: 6px; background: #444; border: 1px solid #666; border-radius: 4px; overflow: hidden; }
+        .bar-fill { height: 100%; width: 100%; transition: width 0.5s; }
+
+        /* Minimap */
+        #minimap-container {
+            position: absolute; top: 60px; right: 10px; width: 150px; height: 150px;
+            background: #000; border: 2px solid #8b4513; border-radius: 4px;
+            z-index: 20; display: none; pointer-events: auto; cursor: crosshair;
+        }
+        #minimap-canvas { width: 100%; height: 100%; display: block; }
+
+        /* Sidebar & Camera */
+        #left-sidebar {
+            position: absolute; top: 60px; bottom: 10px; left: 10px; width: 240px;
+            z-index: 10; display: flex; flex-direction: column; gap: 5px;
+            pointer-events: none; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #d35400 #222;
+        }
+        #left-sidebar::-webkit-scrollbar { width: 6px; }
+        #left-sidebar::-webkit-scrollbar-thumb { background-color: #d35400; border-radius: 3px; }
+        #left-sidebar .panel { pointer-events: auto; flex-shrink: 0; }
+
+        #camera-controls {
+            position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+            width: auto; min-width: 240px; z-index: 9;
+        }
+        #camera-controls .panel-content { display: flex; gap: 8px; justify-content: center; align-items: center; }
+
+        /* Queen Speech */
+        #queen-speech {
+            position: absolute; bottom: 15px; right: 15px; width: 220px;
+            display: flex; flex-direction: column; align-items: flex-end; pointer-events: auto; 
+        }
+        .bubble {
+            background: white; color: black; padding: 10px; border-radius: 12px 12px 0 12px;
+            margin-bottom: 8px; font-family: 'Roboto Mono', monospace; font-size: 0.75em;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3); min-height: 30px; display: flex;
+            flex-direction: column; justify-content: flex-end; opacity: 0.95; cursor: pointer; transition: transform 0.1s;
+        }
+        .bubble:hover { transform: scale(1.02); background: #f0f0f0; }
+        .msg-line { margin-bottom: 3px; border-bottom: 1px solid #eee; padding-bottom: 2px; }
+        .msg-line:last-child { border-bottom: none; margin-bottom: 0; font-weight: bold; }
+
+        .queen-portrait {
+            width: 75px; height: 75px; background: #d2691e; border-radius: 50%;
+            border: 3px solid white; overflow: hidden; position: relative;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .queen-portrait:hover { transform: scale(1.05); box-shadow: 0 0 8px #f1c40f; }
+        .queen-face { position: absolute; top: 15px; left: 15px; width: 45px; height: 37px; background: #8b0000; border-radius: 40% 40% 50% 50%; }
+        .eye { position: absolute; top: 26px; width: 7px; height: 7px; background: black; border-radius: 50%; }
+
+        /* ========================================= */
+        /* === RESPONSIVE MENU SYSTEM (UPDATED) === */
+        /* ========================================= */
+
+        #menu-overlay, #game-over-screen, #win-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(20, 20, 20, 0.98);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            pointer-events: auto; z-index: 100;
+            padding: 20px; /* Padding for mobile safety */
+            box-sizing: border-box;
+            overflow-y: auto; /* Allow scroll on landscape mobile */
+        }
+        
+        #game-over-screen, #win-screen { display: none; text-align: center; }
+        #win-screen { background: linear-gradient(to bottom, #f1c40f, #d35400); }
+
+        /* Typography Scaling */
+        h1 { 
+            color: #e74c3c; margin-bottom: 8px; 
+            font-size: clamp(1.8rem, 5vw, 3rem); /* Responsive font size */
+            text-transform: uppercase; letter-spacing: 2px; 
+            text-align: center;
+            text-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        h2 { 
+            color: #aaa; margin-bottom: 25px; font-weight: normal; 
+            font-size: clamp(1rem, 3vw, 1.5rem); 
+            text-align: center;
+        }
+        h3 { color: #d35400; border-bottom: 1px solid #555; padding-bottom: 4px; margin-top: 15px; font-size: 1em; }
+
+        /* Menu Button Container */
+        #menu-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 100%;
+            max-width: 350px; /* Don't get too wide on desktop */
+        }
+
+        /* Standard Button Styling */
+        .btn {
+            background: #d35400; color: white; border: none; 
+            padding: 6px 12px; margin: 4px; font-size: 0.95em;
+            cursor: pointer; border-radius: 5px;
+            font-family: 'Signika', sans-serif; 
+            transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+            text-align: center;
+            box-shadow: 0 4px 0 #a04000; /* 3D effect */
+        }
+        
+        .btn:hover { 
+            transform: translateY(-2px); 
+            background: #e67e22; 
+            box-shadow: 0 6px 0 #a04000;
+        }
+        .btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 0 0 #a04000;
+        }
+        .btn:disabled { 
+            background: #555; cursor: not-allowed; 
+            transform: none; box-shadow: none; 
+        }
+
+        /* Special Menu Button Styling (More robust) */
+        #menu-buttons .btn, #game-over-screen .btn, #win-screen .btn {
+            padding: 15px 20px;
+            font-size: 1.2em;
+            width: 100%;
+            margin: 0; /* Margin handled by container gap */
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        /* Smaller in-game buttons */
+        .btn-small { padding: 4px 8px; font-size: 0.85em; width: auto; margin: 0; box-shadow: none; }
+        .btn-active { background: #27ae60; border: 1px solid #2ecc71; }
+
+        .multiplier-btn {
+            background: #444; border: 1px solid #666; color: #aaa;
+            font-size: 0.8em; padding: 2px 6px; cursor: pointer; border-radius: 3px;
+            min-width: 25px; margin-right: 3px; display: inline-block;
+        }
+        .multiplier-btn:hover { background: #555; color: white; }
+        .multiplier-btn.active { background: #f1c40f; color: #000; border-color: #d35400; font-weight: bold; box-shadow: 0 0 5px rgba(241, 196, 15, 0.5); }
+
+        .hatch-btn {
+            display: flex; justify-content: space-between; align-items: center;
+            width: 100%; background: #444; margin: 4px 0; padding: 6px;
+            font-size: 0.85em; border-left: 3px solid #d35400; box-sizing: border-box;
+            transition: background 0.2s;
+        }
+        .hatch-btn:hover { background: #555; transform: none; box-shadow: none;}
+        .hatch-btn.locked { background: #222; border-left-color: #555; color: #777; cursor: not-allowed; }
+        .upgrade-btn {
+            display: flex; justify-content: space-between; align-items: center;
+            width: 100%; background: #222; margin: 4px 0; padding: 6px;
+            font-size: 0.8em; border: 1px solid #8b4513; border-left: 3px solid #9b59b6;
+            box-sizing: border-box; color: #ccc;
+        }
+        .upgrade-btn:hover { background: #333; transform: none; box-shadow: none; }
+        
+        .priority-btn {
+            background: #333; border: 1px solid #555; padding: 4px; margin: 2px;
+            font-size: 0.75em; color: #aaa; cursor: pointer; flex: 1; min-height: 30px; /* Bigger touch area */
+        }
+        .priority-btn.active { background: #2ecc71; color: #000; font-weight: bold; }
+        .priority-btn.attack { border-color: #c0392b; }
+        .priority-btn.attack.active { background: #c0392b; color: white; }
+
+        /* Modals */
+        #help-modal, #log-modal, #settings-modal, #tutorial-modal {
+            display: none; position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); width: 85%; max-width: 700px;
+            background: rgba(30, 30, 30, 0.98); border: 2px solid #d35400;
+            border-radius: 10px; padding: 20px; z-index: 300; overflow-y: auto;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8); color: #eee; pointer-events: auto; max-height: 85%;
+        }
+        #settings-modal { max-width: 400px; }
+        #tutorial-modal { max-width: 500px; text-align: left; border-color: #27ae60; }
+        
+        #game-menu-modal {
+            display: none; position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); width: 300px;
+            background: rgba(20, 20, 20, 0.95); border: 2px solid #d35400;
+            border-radius: 10px; padding: 20px; z-index: 200; text-align: center;
+            pointer-events: auto; box-shadow: 0 0 20px rgba(0,0,0,0.8);
+        }
+        #pause-overlay {
+            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.4); z-index: 150; justify-content: center; align-items: center;
+            pointer-events: auto; backdrop-filter: blur(2px);
+        }
+
+        .settings-row {
+            display: flex; align-items: center; justify-content: space-between;
+            background: #222; padding: 12px; margin: 5px 0; border-radius: 5px; border: 1px solid #444;
+        }
+        .settings-row label { cursor: pointer; flex: 1; text-align: left; font-size: 1.1em; }
+        input[type=checkbox] { transform: scale(1.5); cursor: pointer; }
+
+        .close-btn {
+            position: absolute; top: 10px; right: 10px; background: #c0392b; border: none;
+            color: white; font-size: 1.5em; width: 36px; height: 36px; border-radius: 50%; cursor: pointer;
+        }
+
+        .tombstone { margin: 20px auto; width: 150px; }
+        .end-stat { color: #d35400; font-weight: bold; font-size: 0.9em; }
+        .behavior-label { color: #3498db; font-size: 0.75em; margin-top: 8px; text-transform: uppercase; }
+        .confetti { position: absolute; width: 10px; height: 10px; background: red; animation: fall linear forwards; }
+        @keyframes fall { to { transform: translateY(100vh) rotate(720deg); } }
+
+        /* Mobile Adjustments */
+        @media (max-width: 800px) {
+            body { font-size: 12px; }
+            #left-sidebar { width: 190px; top: 120px; bottom: 5px; }
+            #camera-controls { left: 50%; transform: translateX(-50%); width: 95%; }
+            #stats-bar { height: auto; flex-wrap: wrap; gap: 8px; padding: 5px; top: 40px; justify-content: center; }
+            #top-buttons { top: 5px; right: 5px; }
+            .resource-group { min-width: 40px; }
+            .bar-container { width: 50px; height: 5px; }
+            #minimap-container { width: 100px; height: 100px; top: 130px; }
+            .queen-portrait { width: 60px; height: 60px; }
+            .queen-face { top: 12px; left: 12px; width: 35px; height: 30px; }
+            .eye { top: 20px; width: 5px; height: 5px; }
+            .eye:nth-child(2) { left: 15px; } .eye:nth-child(3) { left: 30px; }
+            #queen-speech { width: 160px; right: 10px; bottom: 10px; }
+            .panel { padding: 6px; }
+            
+            /* Better Modal for Mobile */
+            #help-modal, #log-modal, #settings-modal, #tutorial-modal { width: 95%; height: 90%; }
+            #menu-buttons { width: 90%; }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="game-canvas"></canvas>
+    <div id="custom-tooltip"></div>
+
+    <div id="ui-layer">
+        <div id="top-buttons">
+            <button class="btn btn-small" onclick="game.togglePause()">Pauza</button>
+            <button class="btn btn-small" onclick="game.toggleGameMenu()">Menu</button>
+        </div>
+
+        <div id="stats-bar" class="panel" style="display: none;">
+            <div class="resource-group" id="cont-water" onmouseenter="game.showTooltip(this, 'water')" onmouseleave="game.hideTooltip()">
+                <div class="res-icon">💧 Voda</div>
+                <div class="bar-container"><div id="bar-water" class="bar-fill" style="background: #3498db;"></div></div>
+                <div id="val-water" class="res-text">0</div>
+            </div>
+            <div class="resource-group" id="cont-sugar" onmouseenter="game.showTooltip(this, 'sugar')" onmouseleave="game.hideTooltip()">
+                <div class="res-icon">🍬 Cukry</div>
+                <div class="bar-container"><div id="bar-sugar" class="bar-fill" style="background: #f1c40f;"></div></div>
+                <div id="val-sugar" class="res-text">0</div>
+            </div>
+            <div class="resource-group" id="cont-protein" onmouseenter="game.showTooltip(this, 'protein')" onmouseleave="game.hideTooltip()">
+                <div class="res-icon">🥩 Bílkoviny</div>
+                <div class="bar-container"><div id="bar-protein" class="bar-fill" style="background: #e74c3c;"></div></div>
+                <div id="val-protein" class="res-text">0</div>
+            </div>
+            <div class="resource-group" id="cont-fat" onmouseenter="game.showTooltip(this, 'fat')" onmouseleave="game.hideTooltip()">
+                <div class="res-icon">🌰 Tuky</div>
+                <div class="bar-container"><div id="bar-fat" class="bar-fill" style="background: #e67e22;"></div></div>
+                <div id="val-fat" class="res-text">0</div>
+            </div>
+            <div class="resource-group" id="cont-queen" style="border-left: 1px solid #555; padding-left: 15px;" onmouseenter="game.showTooltip(this, 'queen')" onmouseleave="game.hideTooltip()">
+                <div class="res-icon">👑 Zdraví</div>
+                <div class="bar-container"><div id="bar-queen" class="bar-fill" style="background: #9b59b6;"></div></div>
+                <div id="val-queen" class="res-text">0</div>
+            </div>
+            <div class="resource-group" onmouseenter="game.showTooltip(this, 'time')" onmouseleave="game.hideTooltip()">
+                <div class="res-icon">⏳ Čas</div>
+                <div id="val-time" class="res-text">--m</div>
+            </div>
+            <div class="resource-group">
+                <div class="res-icon">🐜 Počet</div>
+                <div id="pop-count" style="font-weight: bold; font-size: 1.2em;">0</div>
+            </div>
+            <div class="resource-group">
+                <div class="res-icon">💀 Obtížnost</div>
+                <div id="difficulty-lvl" style="font-weight: bold; font-size: 1.1em; color: #e74c3c;">Lvl 0</div>
+            </div>
+        </div>
+
+        <div id="minimap-container" title="Klikni pro rychlý přesun">
+            <canvas id="minimap-canvas"></canvas>
+        </div>
+
+        <div id="camera-controls" class="panel" style="display: none;">
+            <div class="panel-header" onclick="game.togglePanel('camera-controls')">
+                <h3>Kamera</h3>
+                <button class="minimize-btn">-</button>
+            </div>
+            <div class="panel-content">
+                <button id="cam-queen" class="btn btn-small btn-active" onclick="game.setCamera('QUEEN')">Hnízdo</button>
+                <button id="cam-free" class="btn btn-small" onclick="game.setCamera('FREE')">Volný pohled</button>
+                <button id="cam-ant" class="btn btn-small" onclick="game.setCamera('ANT')">Sledovat Dělnici</button>
+                <div style="font-size: 0.7em; color: #aaa; margin-top: 5px; display:none;">
+                    Volný pohled: Táhni myší<br>
+                    Dělnice: Klik pro další
+                </div>
+            </div>
+        </div>
+
+        <div id="left-sidebar">
+            
+            <div id="controls" class="panel" style="display: none;">
+                <div class="panel-header" onclick="game.togglePanel('controls')">
+                    <h3>Řízení kolonie</h3>
+                    <button class="minimize-btn">-</button>
+                </div>
+                <div class="panel-content">
+                    <h3 style="margin: 15px 0 5px 0; color: #27ae60;">Priority Zdroje</h3>
+                    <div style="display: flex; flex-wrap: wrap;">
+                        <button class="priority-btn active" onclick="game.setPriority('all')">Vše</button>
+                        <button class="priority-btn" onclick="game.setPriority('water')">Voda</button>
+                        <button class="priority-btn" onclick="game.setPriority('sugar')">Cukry</button>
+                        <button class="priority-btn" onclick="game.setPriority('protein')">Prot</button>
+                        <button class="priority-btn" onclick="game.setPriority('fat')">Tuky</button>
+                        <button class="priority-btn attack" onclick="game.setPriority('attack')">⚔️ ÚTOK</button>
+                    </div>
+
+                    <h3 style="margin: 15px 0 5px 0; color: #3498db;">Strategie Feromonů</h3>
+                    <div style="display: flex; flex-wrap: wrap;">
+                        <button class="priority-btn active" id="beh-scout" onclick="game.setBehavior('SCOUT')">Průzkum</button>
+                        <button class="priority-btn" id="beh-trail" onclick="game.setBehavior('TRAIL')">Stopování</button>
+                        <button class="priority-btn" id="beh-defend" onclick="game.setBehavior('DEFEND')">Obrana</button>
+                    </div>
+
+                    <h3 style="margin: 15px 0 5px 0; color: #e67e22;">Speciální akce</h3>
+                    <button id="btn-mark" class="btn btn-small" onclick="game.toggleMarkingMode()">Označit oblast (25 🍬)</button>
+                </div>
+            </div>
+
+            <div id="brood-panel" class="panel" style="display: none;">
+                <div class="panel-header" onclick="game.togglePanel('brood-panel')">
+                    <h3>Výběr potomstva</h3>
+                    <button class="minimize-btn">-</button>
+                </div>
+                <div class="panel-content">
+                    <div id="goal-section">
+                        <div class="behavior-label">Cíl: 30M + 15Q (2:1)</div>
+                        <div style="font-size:0.7em; color:#aaa; margin-bottom:5px;">
+                            <div id="win-progress">0M / 0Q</div>
+                        </div>
+                    </div>
+
+                    <div id="brood-section">
+                         <!-- Multiplier Controls Added Here -->
+                         <div id="multiplier-controls" style="margin-bottom: 8px; display: flex; gap: 4px; justify-content: center;"></div>
+                         <div id="hatch-buttons"></div>
+                    </div>
+                    <div id="brood-message" style="display:none; color:#777; font-style:italic; margin-bottom:10px; text-align:center;">
+                        Líhnutí dostupné jen v hnízdě.
+                    </div>
+
+                    <div id="upgrade-section">
+                        <div class="behavior-label" style="color: #9b59b6; padding-top: 5px;">Vylepšení Kast</div>
+                        <div id="upgrade-buttons"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div id="queen-speech" style="display: none;">
+            <div id="bubble-text" class="bubble" title="Klikni pro historii zpráv" onclick="game.toggleLog()">
+                <div class="msg-line">Vítej ve hře.</div>
+                <div class="msg-line">Klikni pro pohyb.</div>
+            </div>
+            <div class="queen-portrait">
+                <div class="queen-face"></div>
+                <div class="eye" style="left: 19px;"></div>
+                <div class="eye" style="left: 34px;"></div>
+            </div>
+        </div>
+
+        <div id="menu-overlay">
+            <h1>Formyrmex ruforuber</h1>
+            <h2>Hyperrealistický Simulátor</h2>
+            
+            <div id="menu-buttons">
+                <button class="btn" onclick="game.start('meadow')">Louka (Standard)</button>
+                <button class="btn" onclick="game.start('desert')">Poušť (Hard)</button>
+                <button class="btn" onclick="game.load()" id="load-btn" style="background: #555;">Načíst hru</button>
+                <button class="btn" onclick="game.toggleSettings()" style="background: #555;">Nastavení</button>
+            </div>
+
+            <p style="color: #888; margin-top: 30px; font-size: 0.8em; text-align: center; max-width: 400px;">
+                Data se ukládají do prohlížeče.<br>
+                Ovládání: Myš (Klik pro pohyb/interakci).<br>
+                Zoom: Kolečko myši.<br>
+                Výběr prostředí ovlivňuje dostupnost zdrojů.
+            </p>
+        </div>
+        
+        <div id="game-over-screen">
+            <h1 style="color: #c0392b; margin-bottom: 5px;">Konec Kolonie</h1>
+            <div class="tombstone">
+                <img src="https://media.tenor.com/WZV5pw6p5dUAAAAi/dies-death.gif" alt="Death GIF" style="width: 100%; border-radius: 10px;">
+            </div>
+            <div id="final-stats" style="margin: 20px; text-align: left; display: inline-block;"></div>
+            <button class="btn" onclick="location.reload()">Zkusit znovu</button>
+        </div>
+
+        <div id="win-screen">
+            <h1 style="color: #fff; text-shadow: 2px 2px 0 #000;">VÍTĚZSTVÍ!</h1>
+            <h2 style="color: #fff;">Svatební let započal!</h2>
+            <p style="color: #fff; font-size: 1.2em; max-width: 600px;">
+                Tvá kolonie dosáhla dospělosti. Stovky samců a mladých královen vylétají k nebi, aby založily nové generace druhu <i>Formyrmex ruforuber</i>.
+            </p>
+            <div id="win-stats" style="margin: 20px; text-align: left; display: inline-block;"></div>
+            <button class="btn" onclick="location.reload()">Hrát znovu</button>
+        </div>
+
+        <div id="log-modal">
+            <button class="close-btn" onclick="game.toggleLog()">×</button>
+            <h1 style="font-size: 2em; border-bottom: 2px solid #d35400;">Deník Kolonie</h1>
+            <div id="log-content"></div>
+        </div>
+
+        <div id="tutorial-modal">
+            <h1 style="font-size: 1.5em; border-bottom: 2px solid #27ae60; margin-bottom: 15px; color: #2ecc71;">Zakládání Kolonie</h1>
+            
+            <div style="margin-bottom: 15px; color: #ddd; line-height: 1.5;">
+                <p><strong>1. Vyber místo:</strong> Kliknutím do mapy navedeš letící královnu na bezpečné místo.</p>
+                <p><strong>2. Založ hnízdo:</strong> Až budeš na místě, klikni přímo na královnu (nebo do její těsné blízkosti), aby se zahrabala a založila první komůrku.</p>
+                <p><strong>3. Vybuduj impérium:</strong> Řiď zdroje, líhni nové kasty a braň se predátorům.</p>
+                <p style="margin-top: 10px; color: #f1c40f; font-weight: bold;">Cíl hry: Vychovat 15 Mladých Královen a 30 Samců.</p>
+            </div>
+
+            <button class="btn" style="width: 100%; background: #27ae60;" onclick="game.closeTutorial()">Rozumím!</button>
+        </div>
+
+        <div id="settings-modal">
+            <button class="close-btn" onclick="game.toggleSettings()">×</button>
+            <h1 style="font-size: 1.5em; border-bottom: 2px solid #d35400; margin-bottom: 20px;">Nastavení</h1>
+            
+            <div class="settings-row">
+                <label for="chk-status-text">Zobrazovat popisky stavu</label>
+                <input type="checkbox" id="chk-status-text" checked onchange="game.toggleStatusText(this.checked)">
+            </div>
+            
+            <div class="settings-row">
+                <label for="chk-emoji-mode">Režim Emoji (⛏️ místo textu)</label>
+                <input type="checkbox" id="chk-emoji-mode" onchange="game.toggleEmojiMode(this.checked)">
+            </div>
+
+            <div class="settings-row">
+                <label for="chk-music">Přehrávat hudbu</label>
+                <input type="checkbox" id="chk-music" checked onchange="game.toggleMusic(this.checked)">
+            </div>
+
+            <div class="settings-row">
+                <label for="chk-sfx">Přehrávat zvuky (SFX)</label>
+                <input type="checkbox" id="chk-sfx" checked onchange="game.toggleSfx(this.checked)">
+            </div>
+
+            <button class="btn" style="width: 100%; margin-top: 20px; background: #555;" onclick="game.toggleSettings()">Zavřít</button>
+        </div>
+
+        <div id="game-menu-modal">
+            <h1 style="color: #d35400; margin-top: 0;">Menu</h1>
+            <div id="menu-buttons" style="margin: 0 auto;">
+                <button class="btn" onclick="game.toggleHelp()">Nápověda</button>
+                <button class="btn" onclick="game.toggleSettings()">Nastavení</button>
+                <button class="btn" style="background: #c0392b;" onclick="location.reload()">Restart</button>
+                <button class="btn" style="background: #555;" onclick="game.toggleGameMenu()">Zavřít</button>
+            </div>
+        </div>
+
+        <div id="pause-overlay">
+            <button class="btn" style="font-size: 1.5em; padding: 15px 30px;" onclick="game.togglePause()">SPUSTIT</button>
+        </div>
+
+        <div id="help-modal">
+            <button class="close-btn" onclick="game.toggleHelp()">×</button>
+            <h1 style="font-size: 1.8em; border-bottom: 2px solid #d35400;">Myrmekopedie</h1>
+            <div style="font-style: italic; color: #888; margin-bottom: 10px;">Hyperrealistický simulátor kolonie Formyrmex ruforuber</div>
+            
+            <h3 style="color:#e74c3c;">Herní smyčka a Cíle</h3>
+            <p>Tvým cílem je zajistit přežití kolonie a odchovat reprodukční jedince (30 Samců a 15 Královen) předtím, než tvá Královna zemře stářím.</p>
+            <ul>
+                <li><strong>Výběr biomu:</strong> Louka nabízí vyvážené zdroje. Poušť je drsná, s nedostatkem vody, ale méně predátory v úvodu.</li>
+                <li><strong>Zakládání (Claustrální):</strong> Na začátku Královna naklade vajíčka. Musíš počkat, až se vylíhnou první <strong>Nanitici</strong>. Toto je nejkritičtější fáze.</li>
+                <li><strong>Navigace:</strong> Klikni do Minimapy vpravo pro rychlý přesun kamery.</li>
+                <li><strong>Sběr:</strong> Těž Vodu, Cukr, Bílkoviny a Tuky. Voda je v poušti kritická!</li>
+            </ul>
+
+            <h3 style="color:#27ae60;">Běh na pozadí (NOVÉ)</h3>
+            <p>
+                Kolonie nyní nespí, ani když se nedíváš. Pokud přepneš na jinou záložku prohlížeče, simulace nadále běží díky <strong>pracovnímu vláknu (Web Worker)</strong>.
+                Mravenci budou dál těžit a bránit hnízdo. Vrať se včas, než jim dojdou zdroje!
+            </p>
+
+            <h3 style="color:#f1c40f;">Zvuková komunikace (Stridulace)</h3>
+            <p>
+                Hra nyní simuluje zvukové projevy mravenců. Zapni si zvuk pro lepší orientaci!
+                <br><strong>Hlasité cvakání:</strong> Útok nebo poplach. Mravenci stridulují (třou zadečkem), když jsou v nebezpečí.
+                <br><strong>Jemné pípnutí:</strong> Líhnutí nového jedince nebo dokončení těžby.
+                <br><strong>Kliknutí UI:</strong> Zpětná vazba ovládání.
+            </p>
+
+            <h3 style="color:#e74c3c;">Biologický Bestiář (Enemáci)</h3>
+            <div style="font-size: 0.9em; color: #ccc;">
+                <p><strong style="color: #d35400;">Pavouk (Zodarion italicum)</strong><br>
+                Tento specializovaný mravenčí zabiják loví taktikou "hit & run". Ve dne se skrývá, v noci útočí na osamělé dělnice rychlým kousnutím do nohy a následným ústupem, dokud jed nezaúčinkuje.</p>
+                
+                <p><strong style="color: #f1c40f;">Velká ještěrka (Lygodactylus picturatus)</strong><br>
+                Gekon žlutavý. Denní predátor, pro kterého je mravenčí kolonie lákavým zdrojem potravy. Díky své velikosti a rychlosti představuje pro kolonii titánskou hrozbu, kterou dokáží udolat jen Vojáci.</p>
+                
+                <p><strong style="color: #27ae60;">Žába (Breviceps fuscus)</strong><br>
+                Dešťovnice (Black Rain Frog). Tato žába se zahrabává do země a funguje jako živý tank. Její kůže je pokryta lepivým sekretem, což ji činí odolnou vůči kousnutí menších mravenců.</p>
+                
+                <p><strong style="color: #c0392b;">Nájezdníci (Rod Aenictus)</strong><br>
+                Praví "Army Ants" (nájezdní mravenci) Starého světa. Jsou slepí, ale spoléhají na masivní počty a feromonovou komunikaci. Specializují se na "mravenčí války" – nájezdy na cizí kolonie s cílem ukrást plod (larvy) pro vlastní potravu.</p>
+            </div>
+
+            <h3 style="color:#3498db;">Statistiky Kast</h3>
+            <table class="stat-table">
+                <tr><th>Kasta</th><th>Životy</th><th>Nosnost</th><th>Poškození</th><th>Vývoj (s)</th><th>Role</th></tr>
+                <tr><td>Nanitic</td><td>20</td><td>6</td><td>1</td><td>15</td><td>"Pygmy" generace. Rychlý vývoj, slabá.</td></tr>
+                <tr><td>Minor</td><td>40</td><td>8</td><td>2</td><td>25</td><td>Základní dělnice, údržba hnízda.</td></tr>
+                <tr><td>Media</td><td>80</td><td>12</td><td>5</td><td>35</td><td>Univerzální, efektivní sběr.</td></tr>
+                <tr><td>Major</td><td>150</td><td>16</td><td>12</td><td>50</td><td>Sklad (živé konzervy) a tank.</td></tr>
+                <tr><td>Voják</td><td>300</td><td>20</td><td>25</td><td>65</td><td>Obrana kolonie, drcení potravy.</td></tr>
+                <tr><td>Samec</td><td>30</td><td>0</td><td>-</td><td>40</td><td>Pouze spotřeba, cíl hry.</td></tr>
+                <tr><td>Mladá Q</td><td>500</td><td>0</td><td>10</td><td>90</td><td>Budoucí zakladatelka, cíl hry.</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            /* === GAME CONSTANTS & CONFIG === */
+            const C = {
+                TILE_SIZE: 20,
+                MAP_WIDTH: 2000,
+                MAP_HEIGHT: 2000,
+                VIEW_DIST: 250, 
+                ANT_VIEW: 100,
+                RES: { WATER: 'water', SUGAR: 'sugar', PROTEIN: 'protein', FAT: 'fat' },
+                // UPDATED MAX_STATS to reflect real colony maximums + buffer for upgrades
+                MAX_STATS: { 
+                    HP: 1000,   // Was 300. Queen is 500, Upgraded Queen can be 1000+
+                    DMG: 50,    // Was 25. Soldier is 25, Upgraded Soldier 50+
+                    LOAD: 30,   // Was 20. Major is 25.
+                    SPEED: 2.5, // Was 2.0. Male is 2.0.
+                    HATCH: 100, // Was 90. Queen is 90.
+                    CAP: 100    // Was 80. Major is 80.
+                }, 
+                CASTE: {
+                    NANITIC: { name: 'Nanitic', cost: { w: 5, s: 5, p: 5, f: 2 }, hp: 20, dmg: 1, speed: 1.2, size: 3, color: '#ffaaaa', load: 7, cap: 10, hatchTime: 15, desc: "Rychlý, levný, ale slabý." },
+                    MINOR: { name: 'Minor', cost: { w: 10, s: 10, p: 10, f: 5 }, hp: 40, dmg: 2, speed: 1.5, size: 4, color: '#cc5555', req: 0, load: 10, cap: 20, hatchTime: 25, desc: "Základní dělnice." },
+                    MEDIA: { name: 'Media', cost: { w: 20, s: 20, p: 25, f: 10 }, hp: 80, dmg: 5, speed: 1.3, size: 6, color: '#aa3333', req: 20, load: 15, cap: 50, hatchTime: 35, desc: "Univerzální sběrač." },
+                    MAJOR: { name: 'Major', cost: { w: 40, s: 40, p: 50, f: 20 }, hp: 150, dmg: 12, speed: 1.1, size: 8, color: '#880000', req: 50, load: 22, cap: 80, hatchTime: 50, desc: "Tank a nosič." },
+                    SOLDIER: { name: 'Voják', cost: { w: 60, s: 60, p: 80, f: 40 }, hp: 300, dmg: 25, speed: 1.0, size: 10, color: '#550000', req: 100, load: 18, cap: 50, hatchTime: 65, desc: "Elitní obrana kolonie." },
+                    MALE: { name: 'Samec', cost: { w: 50, s: 50, p: 20, f: 10 }, hp: 30, dmg: 0, speed: 2.0, size: 5, color: '#222', req: 200, load: 0, cap: 0, hatchTime: 40, desc: "Pouze spotřebovává, nutný pro výhru." }, 
+                    QUEEN_NEW: { name: 'Mladá Královna', cost: { w: 200, s: 200, p: 200, f: 200 }, hp: 500, dmg: 10, speed: 0.8, size: 12, color: '#d2691e', req: 300, load: 0, cap: 0, hatchTime: 90, desc: "Budoucí zakladatelka." }
+                }
+            };
+
+            const rand = (min, max) => Math.random() * (max - min) + min;
+            const dist = (x1, y1, x2, y2) => Math.sqrt((x2-x1)**2 + (y2-y1)**2);
+
+            /* === SOUND SYNTHESIZER CLASS === */
+            class SoundSynthesizer {
+                constructor() {
+                    this.enabled = true;
+                    this.ctx = null;
+                }
+
+                init() {
+                    if (!this.ctx) {
+                        const AudioContext = window.AudioContext || window.webkitAudioContext;
+                        this.ctx = new AudioContext();
+                    }
+                    if (this.ctx.state === 'suspended') {
+                        this.ctx.resume();
+                    }
+                }
+
+                playTone(freq, type, duration, vol = 0.1) {
+                    if (!this.enabled || !this.ctx) return;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    
+                    gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                }
+
+                playClick() { this.playTone(800, 'sine', 0.05, 0.05); }
+                
+                playHatch() { 
+                    if (!this.enabled || !this.ctx) return;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(400, this.ctx.currentTime);
+                    osc.frequency.linearRampToValueAtTime(1200, this.ctx.currentTime + 0.3);
+                    gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.3);
+                    osc.connect(gain); gain.connect(this.ctx.destination);
+                    osc.start(); osc.stop(this.ctx.currentTime + 0.3);
+                }
+
+                playAttack() { this.playTone(150, 'sawtooth', 0.1, 0.15); }
+                playHarvest() { this.playTone(600, 'sine', 0.1, 0.05); }
+                
+                playAlert() {
+                    if (!this.enabled || !this.ctx) return;
+                    for(let i=0; i<3; i++) {
+                        setTimeout(() => this.playTone(1000, 'square', 0.05, 0.1), i * 100);
+                    }
+                }
+
+                playDeath() {
+                    if (!this.enabled || !this.ctx) return;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(200, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(50, this.ctx.currentTime + 0.5);
+                    gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.5);
+                    osc.connect(gain); gain.connect(this.ctx.destination);
+                    osc.start(); osc.stop(this.ctx.currentTime + 0.5);
+                }
+            }
+
+            /* === CLASSES === */
+            class Entity {
+                constructor(x, y) { this.x = x; this.y = y; this.dead = false; }
+            }
+
+            class Brood extends Entity {
+                constructor(x, y, type) {
+                    super(x, y);
+                    this.type = type;
+                    this.totalTime = C.CASTE[type].hatchTime;
+                    this.age = 0; 
+                    this.stage = 'EGG'; 
+                    this.color = '#fff';
+                    this.radius = 2;
+                    this.pulse = 0;
+                }
+
+                update(dt, world) {
+                    this.age += dt;
+                    let progress = this.age / this.totalTime;
+
+                    if (progress < 0.2) {
+                        this.stage = 'EGG';
+                        this.color = '#fff';
+                        this.radius = 2;
+                    } else if (progress < 0.75) {
+                        this.stage = 'LARVA';
+                        let larvaProg = (progress - 0.2) / 0.55;
+                        this.radius = 2 + (3 * larvaProg); 
+                        this.color = '#eee';
+                        this.pulse += dt * 5;
+                    } else if (progress < 1.0) {
+                        this.stage = 'PUPA';
+                        this.radius = 4;
+                        this.color = '#f5deb3';
+                    } else {
+                        this.dead = true;
+                        let a = new Ant(this.x, this.y, this.type, world.upgrades[this.type] || 0);
+                        world.ants.push(a);
+                        world.uiMessage(`${C.CASTE[this.type].name} dospěl!`);
+                        world.sfx.playHatch(); // SFX
+                    }
+                }
+
+                draw(ctx) {
+                    ctx.save();
+                    ctx.translate(this.x, this.y);
+                    ctx.fillStyle = this.color;
+                    
+                    if (this.stage === 'EGG') {
+                        ctx.beginPath(); ctx.ellipse(0, 0, 2, 1.5, 0, 0, Math.PI*2); ctx.fill();
+                    } else if (this.stage === 'LARVA') {
+                        let s = 1 + Math.sin(this.pulse) * 0.05;
+                        ctx.scale(s, s);
+                        ctx.beginPath(); 
+                        ctx.arc(0, 0, this.radius, 0, Math.PI*2); 
+                        ctx.fill();
+                        ctx.strokeStyle = '#ddd'; ctx.lineWidth = 0.5; ctx.stroke();
+                    } else if (this.stage === 'PUPA') {
+                        ctx.beginPath(); ctx.ellipse(0, 0, this.radius, this.radius*1.5, 0, 0, Math.PI*2); ctx.fill();
+                        ctx.strokeStyle = '#d2b48c'; ctx.lineWidth = 1; ctx.stroke();
+                    }
+                    ctx.restore();
+                }
+            }
+
+            class Resource extends Entity {
+                constructor(x, y, type, amount) {
+                    super(x, y);
+                    this.type = type; this.amount = amount; this.maxAmount = amount;
+                    this.radius = Math.sqrt(amount) * 2 + 5;
+                }
+                harvest(qty) {
+                    let taken = Math.min(this.amount, qty);
+                    this.amount -= taken;
+                    if (this.amount <= 0) this.dead = true;
+                    return taken;
+                }
+            }
+
+            class Enemy extends Entity {
+                constructor(x, y, type, difficultyLevel = 0) {
+                    super(x, y);
+                    this.type = type; 
+                    let statMult = 1 + (difficultyLevel * 0.30);
+                    this.lootMult = 1 + (difficultyLevel * 0.15);
+
+                    if (type === 'frog') { 
+                        this.maxHp = 600 * statMult; 
+                        this.dmg = 40 * statMult; 
+                        this.speed = 0.5; 
+                        this.name = "Žába"; 
+                        this.size = 28;
+                        this.baseLoot = 400;
+                    } 
+                    else if (type === 'spider') { 
+                        this.maxHp = 200 * statMult; 
+                        this.dmg = 15 * statMult; 
+                        this.speed = 0.8; 
+                        this.name = "Pavouk"; 
+                        this.size = 15;
+                        this.baseLoot = 100;
+                    } 
+                    else if (type === 'lizard') {
+                        this.maxHp = 400 * statMult;
+                        this.dmg = 80 * statMult;
+                        this.speed = 0.9; 
+                        this.name = "Velká Ještěrka";
+                        this.size = 25;
+                        this.baseLoot = 600;
+                    }
+                    else { 
+                        this.maxHp = 50 * statMult; 
+                        this.dmg = 5 * statMult; 
+                        this.speed = 1.4; 
+                        this.name = "Nájezdník"; 
+                        this.size = 5;
+                        this.baseLoot = 30;
+                    }
+                    this.hp = this.maxHp; this.target = null; this.angle = 0;
+                }
+                update(ants, queen, gameInstance, timeScale) {
+                    let closest = null; let minDist = 250;
+                    let dQ = dist(this.x, this.y, queen.x, queen.y);
+                    if (dQ < minDist) { minDist = dQ; closest = queen; }
+                    for (let a of ants) {
+                        let d = dist(this.x, this.y, a.x, a.y);
+                        if (d < minDist) { minDist = d; closest = a; }
+                    }
+                    if (closest) {
+                        let angle = Math.atan2(closest.y - this.y, closest.x - this.x);
+                        this.x += Math.cos(angle) * this.speed * timeScale;
+                        this.y += Math.sin(angle) * this.speed * timeScale;
+                        this.angle = angle;
+                        
+                        let attackRange = 15;
+                        if (this.type === 'frog') attackRange = 30;
+                        if (this.type === 'lizard') attackRange = 39; 
+                        if (this.type === 'spider') attackRange = 25;
+
+                        if (minDist < attackRange) {
+                            closest.hp -= this.dmg * 0.05; // Keep damage per tick same, or normalize?
+                            // Damage per tick is tricky without changing balance. 
+                            // Assuming 'tick' is logic tick. If logic tick is decoupled from draw, it's fine.
+                            
+                            // SFX for attack (occasional to avoid spam)
+                            if(Math.random() < 0.1) gameInstance.sfx.playAttack();
+
+                            if (closest.hp <= 0 && !closest.dead) {
+                                if (closest === queen) {
+                                     if (!gameInstance.isGameOver) gameInstance.gameOver(`Zabita: ${this.name}`);
+                                } else {
+                                     closest.dead = true;
+                                     gameInstance.reportDeath(closest, this.name);
+                                }
+                            }
+                        }
+                    } else {
+                        if (Math.random() < 0.02 * timeScale) this.angle += rand(-1, 1);
+                        this.x += Math.cos(this.angle) * this.speed * 0.5 * timeScale;
+                        this.y += Math.sin(this.angle) * this.speed * 0.5 * timeScale;
+                    }
+                    if (this.hp <= 0) {
+                        this.dead = true;
+                        gameInstance.sfx.playDeath(); // SFX
+                    }
+                }
+            }
+
+            class Ant extends Entity {
+                constructor(x, y, typeKey, upgrades = 0) {
+                    super(x, y);
+                    let stats = C.CASTE[typeKey];
+                    this.caste = typeKey;
+                    let multiplier = 1 + (upgrades * 0.2);
+                    this.maxHp = stats.hp * multiplier;
+                    this.hp = this.maxHp;
+                    this.speed = stats.speed;
+                    this.dmg = stats.dmg * multiplier;
+                    this.size = stats.size;
+                    this.color = stats.color;
+                    this.carrying = null; this.carryAmount = 0;
+                    this.maxCarry = (stats.load || (this.size * 2)); 
+                    this.state = 'IDLE'; this.stateText = 'Hledám';
+                    this.angle = Math.random() * Math.PI * 2;
+                    this.target = null; this.lastFoodPos = null; this.wanderTimer = 0;
+                    this.tickOffset = Math.floor(Math.random() * 60);
+                }
+                
+                getLabel(useEmoji) {
+                    if (useEmoji) {
+                        switch(this.state) {
+                            case 'IDLE':
+                                if (this.stateText === 'Hlídám') return '🛡️';
+                                if (this.stateText === 'Stopuji' || this.stateText === '👃') return '👃';
+                                return '🔍';
+                            case 'FORAGE': return '⛏️';
+                            case 'RETURN': return '📦';
+                            case 'ATTACK': return '⚔️';
+                            default: return '❓';
+                        }
+                    }
+                    return this.stateText;
+                }
+
+                update(world, frameCount, timeScale) {
+                    if (Math.random() < 0.001) this.hp -= 0.5; 
+                    if (this.hp <= 0) { 
+                        this.dead = true; 
+                        world.reportDeath(this, "Vyčerpání (Stáří)");
+                        world.sfx.playDeath(); // SFX
+                        return; 
+                    }
+                    
+                    let behavior = world.behavior; let priority = world.priority; let markedZone = world.markedZone;
+                    let useEmoji = world.useEmojiStatus;
+                    let shouldScan = (frameCount + this.tickOffset) % 60 === 0;
+
+                    if (this.caste === 'MALE' || this.caste === 'QUEEN_NEW') {
+                        if (Math.random() < 0.01) this.hp -= 0.1; 
+                        if (dist(this.x, this.y, world.queen.x, world.queen.y) > 100) this.moveTo(world.queen.x, world.queen.y, timeScale);
+                        else this.wander(timeScale);
+                        this.stateText = useEmoji ? '❤️' : 'Hledám lásku'; 
+                        return;
+                    }
+                    if (priority === 'attack' && this.state !== 'ATTACK' && this.state !== 'RETURN') {
+                         if (shouldScan) {
+                             let nearestEnemy = this.scanForEnemies(world);
+                             if (nearestEnemy) { 
+                                 this.state = 'ATTACK'; this.target = nearestEnemy; this.stateText = useEmoji ? '⚔️' : "Útočím"; 
+                                 if(Math.random()<0.05) world.sfx.playAlert(); // SFX Occasional alert
+                             }
+                         }
+                    }
+                    if (this.state === 'IDLE') {
+                        this.stateText = behavior === 'DEFEND' ? (useEmoji?'🛡️':'Hlídám') : (useEmoji?'🔍':'Hledám');
+                        
+                        if (behavior === 'DEFEND') {
+                             if (dist(this.x, this.y, world.queen.x, world.queen.y) > 150) this.moveTo(world.queen.x, world.queen.y, timeScale);
+                             else this.wander(timeScale);
+                             
+                             if (shouldScan) {
+                                let e = this.scanForEnemies(world, 200);
+                                if(e) { this.state = 'ATTACK'; this.target = e; }
+                             }
+                        } 
+                        else if (markedZone && markedZone.active && this.state !== 'ATTACK') {
+                            if (dist(this.x, this.y, markedZone.x, markedZone.y) > markedZone.radius) {
+                                this.stateText = useEmoji ? '📍' : 'K oblasti'; this.moveTo(markedZone.x, markedZone.y, timeScale); return;
+                            } else {
+                                if (shouldScan) {
+                                    let res = this.scanForResources(world, markedZone.radius);
+                                    if(res) { this.state = 'FORAGE'; this.target = res; return; }
+                                    let en = this.scanForEnemies(world, markedZone.radius);
+                                    if(en) { this.state = 'ATTACK'; this.target = en; return; }
+                                }
+                                this.wander(timeScale);
+                            }
+                        }
+                        else if (behavior === 'TRAIL' && this.lastFoodPos) {
+                            this.stateText = useEmoji ? '👃' : 'Stopuji';
+                            this.moveTo(this.lastFoodPos.x, this.lastFoodPos.y, timeScale);
+                            if (dist(this.x, this.y, this.lastFoodPos.x, this.lastFoodPos.y) < 20) {
+                                if (shouldScan) {
+                                    let res = this.scanForResources(world, 40);
+                                    if (res) { this.state = 'FORAGE'; this.target = res; } 
+                                    else { this.lastFoodPos = null; this.stateText = useEmoji ? '🚫' : 'Zdroj vyčerpán'; }
+                                }
+                            }
+                        } else {
+                            this.wander(timeScale);
+                            if (shouldScan) {
+                                if (priority === 'attack') { let e = this.scanForEnemies(world); if(e) { this.state = 'ATTACK'; this.target = e; } } 
+                                else if (Math.random() < 0.5) { let res = this.scanForResources(world); if(res) { this.state = 'FORAGE'; this.target = res; } }
+                            }
+                        }
+                    } else if (this.state === 'FORAGE') {
+                        this.stateText = useEmoji ? '⛏️' : 'Těžím';
+                        if (this.target && !this.target.dead) {
+                            this.moveTo(this.target.x, this.target.y, timeScale);
+                            if (dist(this.x, this.y, this.target.x, this.target.y) < 10) {
+                                this.carrying = this.target.type;
+                                this.carryAmount = this.target.harvest(this.maxCarry);
+                                this.lastFoodPos = {x: this.target.x, y: this.target.y}; 
+                                this.state = 'RETURN'; this.target = null;
+                                world.sfx.playHarvest(); // SFX
+                            }
+                        } else { this.state = 'IDLE'; }
+                    } else if (this.state === 'RETURN') {
+                        this.stateText = useEmoji ? '📦' : 'Nesu';
+                        this.moveTo(world.queen.x, world.queen.y, timeScale);
+                        if (dist(this.x, this.y, world.queen.x, world.queen.y) < 20) {
+                            if(this.carrying) {
+                                world.resources[this.carrying] += this.carryAmount;
+                                world.resources[this.carrying] = Math.min(world.resources[this.carrying], world.caps[this.carrying]);
+                            }
+                            this.carrying = null; this.carryAmount = 0; this.state = 'IDLE';
+                        }
+                    } else if (this.state === 'ATTACK') {
+                        this.stateText = useEmoji ? '⚔️' : 'Útočím';
+                        if (this.target && !this.target.dead) {
+                            this.moveTo(this.target.x, this.target.y, timeScale);
+                            if (dist(this.x, this.y, this.target.x, this.target.y) < 15) {
+                                this.target.hp -= this.dmg; 
+                                this.hp -= this.target.dmg * 0.1;
+                                if(Math.random() < 0.1) world.sfx.playAttack(); // SFX
+                                if (this.hp <= 0 && !this.dead) {
+                                    this.dead = true;
+                                    world.reportDeath(this, `Boj (${this.target.name})`);
+                                    world.sfx.playDeath(); // SFX
+                                }
+                            }
+                        } else { this.state = 'IDLE'; }
+                    }
+                    if (this.state !== 'RETURN' && this.state !== 'ATTACK' && shouldScan) { let e = this.scanForEnemies(world, 60); if (e) { this.state = 'ATTACK'; this.target = e; } }
+                    this.x = Math.max(0, Math.min(C.MAP_WIDTH, this.x));
+                    this.y = Math.max(0, Math.min(C.MAP_HEIGHT, this.y));
+                }
+                wander(timeScale) {
+                    this.wanderTimer -= timeScale;
+                    if (this.wanderTimer <= 0) { this.angle += rand(-1, 1); this.wanderTimer = 20; }
+                    this.x += Math.cos(this.angle) * this.speed * timeScale; 
+                    this.y += Math.sin(this.angle) * this.speed * timeScale;
+                }
+                moveTo(tx, ty, timeScale) {
+                    this.angle = Math.atan2(ty - this.y, tx - this.x);
+                    this.x += Math.cos(this.angle) * this.speed * timeScale; 
+                    this.y += Math.sin(this.angle) * this.speed * timeScale;
+                }
+                scanForEnemies(world, range=150) {
+                    let bestDist = range; let bestE = null;
+                    for(let e of world.enemies) {
+                        if(e.dead) continue;
+                        let d = dist(this.x, this.y, e.x, e.y);
+                        if(d < bestDist) { bestDist = d; bestE = e; }
+                    }
+                    return bestE;
+                }
+                scanForResources(world, range=150) {
+                    if (world.priority === 'attack') return null;
+                    let bestDist = range; let bestRes = null;
+                    for (let r of world.mapResources) {
+                        if (r.dead) continue;
+                        if (world.priority !== 'all' && world.priority !== 'attack' && r.type !== world.priority) continue;
+                        let d = dist(this.x, this.y, r.x, r.y);
+                        if (d < bestDist) { bestDist = d; bestRes = r; }
+                    }
+                    return bestRes;
+                }
+            }
+
+            class Game {
+                constructor() {
+                    this.canvas = document.getElementById('game-canvas');
+                    this.ctx = this.canvas.getContext('2d');
+                    this.minimapCanvas = document.getElementById('minimap-canvas');
+                    this.minimapCtx = this.minimapCanvas.getContext('2d');
+                    this.resize();
+                    window.addEventListener('resize', () => this.resize());
+                    this.tooltip = document.getElementById('custom-tooltip');
+                    window.addEventListener('mousemove', (e) => {
+                        if (this.tooltip.style.display === 'block') {
+                            this.tooltip.style.left = (e.clientX + 10) + 'px';
+                            this.tooltip.style.top = (e.clientY + 10) + 'px';
+                        }
+                    });
+                    this.gameState = 'MENU'; this.isGameOver = false;
+                    this.paused = false;
+                    this.biome = 'meadow'; this.cameraMode = 'QUEEN'; 
+                    this.showNestInterior = true; 
+                    this.camX = 0; this.camY = 0; this.followedAntIndex = 0;
+                    this.isDragging = false; this.lastMx = 0; this.lastMy = 0;
+                    
+                    this.zoom = 1.0;
+                    this.frameCount = 0; 
+                    this.hatchMultiplier = 1; // New multiplier logic
+                    
+                    this.showStatusText = true;
+                    this.useEmojiStatus = false; 
+                    
+                    // AUDIO SETUP
+                    this.musicEnabled = true;
+                    this.musicTracks = {
+                        meadow: new Audio('https://files.catbox.moe/qwyvu6.mp3'),
+                        desert: new Audio('https://files.catbox.moe/sq1dv4.mp3')
+                    };
+                    this.musicTracks.meadow.loop = true;
+                    this.musicTracks.desert.loop = true;
+                    this.musicTracks.meadow.volume = 0.4;
+                    this.musicTracks.desert.volume = 0.4;
+                    this.currentTrack = null;
+
+                    // === SFX SYSTEM INIT ===
+                    this.sfx = new SoundSynthesizer();
+
+                    this.queen = { x: 0, y: 0, hp: 1000, maxHp: 1000, age: 0, maxAge: 0, flying: true, tx: null, ty: null, dmg: 20 };
+                    this.queenFighting = false;
+                    this.ants = []; 
+                    this.brood = []; 
+                    this.maxPop = 0; this.maxMales = 0; this.maxQueens = 0;
+                    this.mapResources = []; this.enemies = []; this.startTime = 0;
+                    this.fogCanvas = document.createElement('canvas');
+                    this.fogCtx = this.fogCanvas.getContext('2d');
+                    this.resources = { water: 50, sugar: 50, protein: 50, fat: 50 };
+                    this.caps = { water: 100, sugar: 100, protein: 100, fat: 100 };
+                    this.priority = 'all'; this.behavior = 'SCOUT'; 
+                    this.markingMode = false;
+                    this.markedZone = { x:0, y:0, radius:150, active:false, timer:0 };
+                    this.lastMarkTime = -120000; this.selectedRes = null; 
+                    this.upgrades = {};
+                    for (let key in C.CASTE) { this.upgrades[key] = 0; }
+                    this.upgrades['QUEEN'] = 0;
+                    this.msgQueue = []; this.fullHistory = []; 
+                    
+                    this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
+                    this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+                    this.canvas.addEventListener('wheel', (e) => this.handleWheel(e));
+                    
+                    this.minimapCanvas.addEventListener('mousedown', (e) => this.handleMinimapClick(e));
+                    
+                    window.addEventListener('mouseup', () => { this.isDragging = false; });
+                    this.lastTime = 0;
+                    
+                    this.frogImg = new Image();
+                    this.frogImg.src = 'https://i.imgur.com/oFAdDMT.png';
+                    
+                    this.spiderImg = new Image();
+                    this.spiderImg.src = 'https://i.imgur.com/WKeJ1YI.png';
+                    
+                    this.lizardImg = new Image();
+                    this.lizardImg.src = 'https://i.imgur.com/Y2wRZUc.png';
+
+                    this.raiderImg = new Image();
+                    this.raiderImg.src = 'https://i.imgur.com/dyNIq5C.png';
+
+                    // === BACKGROUND WORKER SETUP ===
+                    this.rafId = null;
+                    this.initBackgroundWorker();
+                }
+
+                // NEW: Background Worker Initialization
+                initBackgroundWorker() {
+                    const workerCode = `
+                        let interval;
+                        self.onmessage = function(e) {
+                            if (e.data === 'start') {
+                                // 60 FPS tick
+                                interval = setInterval(() => postMessage('tick'), 1000 / 60);
+                            } else if (e.data === 'stop') {
+                                clearInterval(interval);
+                            }
+                        };
+                    `;
+                    const blob = new Blob([workerCode], { type: 'application/javascript' });
+                    this.worker = new Worker(URL.createObjectURL(blob));
+
+                    this.worker.onmessage = (e) => {
+                        if (e.data === 'tick') {
+                            // Fixed time step for background processing to ensure stability
+                            this.loop(performance.now(), true); 
+                        }
+                    };
+
+                    document.addEventListener("visibilitychange", () => {
+                        if (document.hidden) {
+                            if (this.rafId) cancelAnimationFrame(this.rafId);
+                            this.worker.postMessage('start');
+                            document.title = "Formyrmex [BĚŽÍ NA POZADÍ]";
+                        } else {
+                            this.worker.postMessage('stop');
+                            document.title = "Formyrmex ruforuber: Simulátor Kolonie";
+                            this.lastTime = performance.now();
+                            this.rafId = requestAnimationFrame((t) => this.loop(t));
+                        }
+                    });
+                }
+                
+                toggleMusic(enabled) {
+                    this.musicEnabled = enabled;
+                    if (enabled) {
+                        if (this.currentTrack) this.currentTrack.play().catch(e => console.log("Audio waiting for interaction"));
+                    } else {
+                        if (this.currentTrack) this.currentTrack.pause();
+                    }
+                    this.sfx.playClick();
+                }
+
+                // NEW: SFX Toggle
+                toggleSfx(enabled) {
+                    this.sfx.enabled = enabled;
+                    if(enabled) this.sfx.playClick();
+                }
+
+                playMusic(biome) {
+                    if (this.currentTrack) {
+                        this.currentTrack.pause();
+                        this.currentTrack.currentTime = 0;
+                    }
+                    this.currentTrack = this.musicTracks[biome];
+                    if (this.musicEnabled && this.currentTrack) {
+                        this.currentTrack.play().catch(e => console.log("Audio play blocked until interaction:", e));
+                    }
+                }
+
+                handleWheel(e) {
+                    e.preventDefault();
+                    const rect = this.canvas.getBoundingClientRect();
+                    const mx = e.clientX - rect.left;
+                    const my = e.clientY - rect.top;
+                    const worldX = (mx / this.zoom) + this.camX;
+                    const worldY = (my / this.zoom) + this.camY;
+                    const zoomSpeed = 0.001;
+                    const delta = -e.deltaY * zoomSpeed;
+                    const newZoom = Math.min(Math.max(0.5, this.zoom + delta), 2.0);
+                    this.camX = worldX - (mx / newZoom);
+                    this.camY = worldY - (my / newZoom);
+                    this.zoom = newZoom;
+                    const effectiveW = this.canvas.width / this.zoom;
+                    const effectiveH = this.canvas.height / this.zoom;
+                    this.camX = Math.max(0, Math.min(this.camX, C.MAP_WIDTH - effectiveW));
+                    this.camY = Math.max(0, Math.min(this.camY, C.MAP_HEIGHT - effectiveH));
+                }
+                
+                handleMinimapClick(e) {
+                    let rect = this.minimapCanvas.getBoundingClientRect();
+                    let mx = e.clientX - rect.left;
+                    let my = e.clientY - rect.top;
+                    let ratioX = C.MAP_WIDTH / rect.width;
+                    let ratioY = C.MAP_HEIGHT / rect.height;
+                    let targetWorldX = mx * ratioX;
+                    let targetWorldY = my * ratioY;
+                    let effectiveW = this.canvas.width / this.zoom;
+                    let effectiveH = this.canvas.height / this.zoom;
+                    this.camX = targetWorldX - effectiveW / 2;
+                    this.camY = targetWorldY - effectiveH / 2;
+                    this.camX = Math.max(0, Math.min(this.camX, C.MAP_WIDTH - effectiveW));
+                    this.camY = Math.max(0, Math.min(this.camY, C.MAP_HEIGHT - effectiveH));
+                    this.setCamera('FREE');
+                    this.showNestInterior = false;
+                    this.sfx.playClick();
+                }
+
+                setHatchMultiplier(val) {
+                    this.hatchMultiplier = val;
+                    this.sfx.playClick();
+                    this.updateHatchButtons();
+                }
+
+                calculateCost(type, qty = 1) {
+                    let base = C.CASTE[type].cost;
+                    let count = this.ants.filter(a => a.caste === type).length;
+                    let multiplier = 1 + (Math.floor(count / 25) * 0.25);
+                    return {
+                        w: Math.floor(base.w * multiplier * qty),
+                        s: Math.floor(base.s * multiplier * qty),
+                        p: Math.floor(base.p * multiplier * qty),
+                        f: Math.floor(base.f * multiplier * qty)
+                    };
+                }
+
+                showTooltip(elem, type, key = null) {
+                    let html = "";
+                    if (type === 'caste' && key) {
+                        let c = C.CASTE[key];
+                        let upgrades = this.upgrades[key] || 0;
+                        let m = 1 + (upgrades * 0.2);
+                        
+                        let hp = Math.floor(c.hp * m);
+                        let dmg = (c.dmg * m).toFixed(1);
+                        let load = c.load || 0;
+                        let speed = c.speed;
+                        let hatchT = c.hatchTime;
+                        let cap = c.cap || 0;
+
+                        let pctHp = Math.min(100, (hp / C.MAX_STATS.HP) * 100);
+                        let pctDmg = Math.min(100, (dmg / C.MAX_STATS.DMG) * 100);
+                        let pctLoad = Math.min(100, (load / C.MAX_STATS.LOAD) * 100);
+                        let pctSpeed = Math.min(100, (speed / C.MAX_STATS.SPEED) * 100);
+                        let pctCap = Math.min(100, (cap / C.MAX_STATS.CAP) * 100);
+                        
+                        // UPDATED HATCH BAR: Inverted (Lower time = Higher bar)
+                        // If Hatch is 0 (instant), bar is 100%. If Hatch is MAX, bar is 0%.
+                        let pctHatch = Math.max(0, Math.min(100, 100 - ((hatchT / C.MAX_STATS.HATCH) * 100)));
+
+                        html += `<div class="tt-header">${c.name} (Lvl ${upgrades})</div>`;
+                        if(c.desc) html += `<div class="tt-desc">${c.desc}</div>`;
+
+                        html += `<div class="tt-row"><div class="tt-label">❤️ Živo.</div><div class="tt-bar-track"><div class="tt-bar-fill" style="width:${pctHp}%; background:#27ae60;"></div></div><div class="tt-val">${hp}</div></div>`;
+                        html += `<div class="tt-row"><div class="tt-label">⚔️ Útok</div><div class="tt-bar-track"><div class="tt-bar-fill" style="width:${pctDmg}%; background:#c0392b;"></div></div><div class="tt-val">${dmg}</div></div>`;
+                        html += `<div class="tt-row"><div class="tt-label">📦 Nosn.</div><div class="tt-bar-track"><div class="tt-bar-fill" style="width:${pctLoad}%; background:#3498db;"></div></div><div class="tt-val">${load}</div></div>`;
+                        html += `<div class="tt-row"><div class="tt-label">🍶 Kap.</div><div class="tt-bar-track"><div class="tt-bar-fill" style="width:${pctCap}%; background:#1abc9c;"></div></div><div class="tt-val">${cap}</div></div>`;
+                        html += `<div class="tt-row"><div class="tt-label">⚡ Rych.</div><div class="tt-bar-track"><div class="tt-bar-fill" style="width:${pctSpeed}%; background:#f1c40f;"></div></div><div class="tt-val">${speed}</div></div>`;
+                        html += `<div class="tt-row"><div class="tt-label">⏳ Líhn.</div><div class="tt-bar-track"><div class="tt-bar-fill" style="width:${pctHatch}%; background:#7f8c8d;"></div></div><div class="tt-val">${hatchT}s</div></div>`;
+
+                    } else if (type === 'upgrade' && key) {
+                        let name = key === 'QUEEN' ? 'Královna' : C.CASTE[key].name;
+                        let lvl = this.upgrades[key] || 0;
+                        html = `<div class="tt-header">Vylepšení: ${name}</div>
+                                <div>Aktuální Lvl: <span style="color:#d35400">${lvl}</span></div>
+                                <div style="color:#ccc; font-size:0.9em; margin-top:5px;">Efekt na další úrovni:</div>
+                                <div style="color:#2ecc71;">+20% Životy</div>
+                                <div style="color:#c0392b;">+20% Poškození</div>`;
+                    }
+                    else if (type === 'queen') {
+                        html = `<div class="tt-header">Královna</div>
+                                <div>Zdraví: ${Math.floor(this.queen.hp)} / ${Math.floor(this.queen.maxHp)}</div>`;
+                    }
+                    else if (type === 'time') {
+                        html = `<div>Čas do úhynu královny stářím.</div>`;
+                    }
+                    else { 
+                        let val = Math.floor(this.resources[type]); 
+                        let max = Math.floor(this.caps[type]); 
+                        let color = '#fff';
+                        if(type==='water') color='#3498db';
+                        if(type==='sugar') color='#f1c40f';
+                        if(type==='protein') color='#e74c3c';
+                        if(type==='fat') color='#e67e22';
+
+                        html = `<div class="tt-header" style="color:${color}">${type.toUpperCase()}</div>
+                                <div>${val} / ${max}</div>`;
+                    }
+                    this.tooltip.innerHTML = html;
+                    this.tooltip.style.display = 'block';
+                }
+                
+                hideTooltip() { this.tooltip.style.display = 'none'; }
+                resize() {
+                    this.canvas.width = window.innerWidth; this.canvas.height = window.innerHeight;
+                    this.minimapCanvas.width = C.MAP_WIDTH; this.minimapCanvas.height = C.MAP_HEIGHT;
+                }
+                initFog() {
+                    this.fogCanvas.width = C.MAP_WIDTH; this.fogCanvas.height = C.MAP_HEIGHT;
+                    this.fogCtx.fillStyle = 'rgba(0,0,0,1)'; this.fogCtx.fillRect(0, 0, C.MAP_WIDTH, C.MAP_HEIGHT);
+                }
+                toggleStatusText(val) { this.showStatusText = val; this.sfx.playClick(); }
+                toggleEmojiMode(val) { this.useEmojiStatus = val; this.sfx.playClick(); }
+                
+                togglePanel(id) {
+                    const panel = document.getElementById(id); panel.classList.toggle('minimized');
+                    const btn = panel.querySelector('.minimize-btn');
+                    btn.textContent = panel.classList.contains('minimized') ? '+' : '-';
+                    this.sfx.playClick();
+                }
+                
+                toggleLog() {
+                    const modal = document.getElementById('log-modal');
+                    const isOpen = modal.style.display === 'block';
+                    modal.style.display = isOpen ? 'none' : 'block';
+                    if (!isOpen) {
+                        const content = document.getElementById('log-content');
+                        content.innerHTML = this.fullHistory.map(entry => `<div class="log-entry"><span class="log-time">[${entry.time}]</span>${entry.text}</div>`).join('');
+                        setTimeout(() => { modal.scrollTop = modal.scrollHeight; }, 10);
+                    }
+                    this.sfx.playClick();
+                }
+
+                togglePause() {
+                    this.paused = !this.paused;
+                    const overlay = document.getElementById('pause-overlay');
+                    overlay.style.display = this.paused ? 'flex' : 'none';
+                    this.sfx.playClick();
+                }
+
+                closeTutorial() {
+                    document.getElementById('tutorial-modal').style.display = 'none';
+                    document.getElementById('ui-layer').style.pointerEvents = 'none'; // Odemknout UI vrstvu
+                    if (this.paused) this.togglePause();
+                    this.sfx.playClick();
+                }
+
+                toggleGameMenu() {
+                    const menu = document.getElementById('game-menu-modal');
+                    menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+                    this.sfx.playClick();
+                }
+
+                toggleSettings() {
+                    const settings = document.getElementById('settings-modal');
+                    settings.style.display = settings.style.display === 'block' ? 'none' : 'block';
+                    this.sfx.playClick();
+                }
+
+                setCamera(mode) {
+                    this.cameraMode = mode;
+                    document.querySelectorAll('#camera-controls .btn').forEach(b => b.classList.remove('btn-active'));
+                    if (mode === 'QUEEN') {
+                        document.getElementById('cam-queen').classList.add('btn-active');
+                        this.showNestInterior = true; 
+                    }
+                    if (mode === 'FREE') document.getElementById('cam-free').classList.add('btn-active');
+                    if (mode === 'ANT') {
+                        document.getElementById('cam-ant').classList.add('btn-active');
+                        if (this.ants.length > 0) {
+                            this.followedAntIndex = (this.followedAntIndex + 1) % this.ants.length;
+                            this.uiMessage(`Sleduji: ${this.ants[this.followedAntIndex].caste}`);
+                        } else {
+                            this.uiMessage("Žádné dělnice ke sledování.");
+                            this.setCamera('QUEEN');
+                        }
+                    }
+                    this.updateHatchButtons();
+                    this.sfx.playClick();
+                }
+                setPriority(p) {
+                    this.priority = p;
+                    document.querySelectorAll('.priority-btn').forEach(b => b.classList.remove('active'));
+                    event.target.classList.add('active');
+                    if(p === 'attack') {
+                        this.uiMessage("ALARM! Priorita: ÚTOK!");
+                        this.sfx.playAlert(); // SFX
+                    }
+                    else this.uiMessage(`Sběr: ${p.toUpperCase()}`);
+                    this.sfx.playClick();
+                }
+                setBehavior(b) {
+                    this.behavior = b;
+                    document.getElementById('beh-scout').classList.remove('active');
+                    document.getElementById('beh-trail').classList.remove('active');
+                    document.getElementById('beh-defend').classList.remove('active');
+                    if(b==='SCOUT') document.getElementById('beh-scout').classList.add('active');
+                    if(b==='TRAIL') document.getElementById('beh-trail').classList.add('active');
+                    if(b==='DEFEND') document.getElementById('beh-defend').classList.add('active');
+                    this.uiMessage(`Mód: ${b}`);
+                    this.sfx.playClick();
+                }
+                toggleMarkingMode() {
+                    let now = Date.now();
+                    if (now - this.lastMarkTime < 30000) { 
+                        this.uiMessage(`Čekejte ${Math.ceil((30000 - (now - this.lastMarkTime))/1000)}s na další značení.`); return;
+                    }
+                    this.markingMode = !this.markingMode;
+                    if(this.markingMode) {
+                        if (this.resources.sugar >= 25) { 
+                             this.canvas.style.cursor = 'crosshair'; 
+                             this.uiMessage("Klikni do mapy pro označení oblasti (25 🍬).");
+                        } else {
+                             this.uiMessage("Nedostatek cukrů (potřeba 25)!");
+                             this.markingMode = false;
+                        }
+                    } else { this.canvas.style.cursor = 'default'; }
+                    this.sfx.playClick();
+                }
+                toggleHelp() {
+                    const modal = document.getElementById('help-modal');
+                    modal.style.display = modal.style.display === 'block' ? 'none' : 'block';
+                    this.sfx.playClick();
+                }
+                initMap(biome) {
+                    this.biome = biome; this.mapResources = []; this.enemies = []; this.ants = [];
+                    this.brood = [];
+                    this.maxPop = 0; this.maxMales = 0; this.maxQueens = 0;
+                    const count = biome === 'meadow' ? 100 : 60;
+                    for(let i=0; i<count; i++) {
+                        let type = Object.values(C.RES)[Math.floor(Math.random() * 4)];
+                        if(biome === 'desert' && type === 'water') if(Math.random() > 0.2) type = 'sugar';
+                        let amt = rand(20, 100);
+                        this.mapResources.push(new Resource(rand(0, C.MAP_WIDTH), rand(0, C.MAP_HEIGHT), type, amt));
+                    }
+                    this.initFog();
+                }
+                start(biome) {
+                    // INIT SFX CONTEXT ON USER ACTION
+                    this.sfx.init();
+
+                    document.getElementById('menu-overlay').style.display = 'none';
+                    document.getElementById('ui-layer').style.pointerEvents = 'none';
+                    document.getElementById('stats-bar').style.display = 'flex';
+                    document.getElementById('queen-speech').style.display = 'flex';
+                    document.getElementById('camera-controls').style.display = 'block';
+                    this.initMap(biome);
+                    
+                    this.playMusic(biome);
+
+                    this.gameState = 'FOUNDING'; this.isGameOver = false;
+                    this.paused = false;
+                    this.startTime = Date.now(); this.lastMarkTime = -120000; 
+                    this.queen.x = C.MAP_WIDTH / 2; this.queen.y = C.MAP_HEIGHT / 2;
+                    this.queen.maxAge = rand(20 * 60, 40 * 60); this.queen.age = 0;
+                    this.queen.maxHp = 1000; this.queen.hp = 1000; this.queen.flying = true;
+                    this.showNestInterior = true;
+                    for (let key in C.CASTE) this.upgrades[key] = 0;
+                    this.upgrades['QUEEN'] = 0;
+                    this.rafId = requestAnimationFrame((t) => this.loop(t));
+                    setInterval(() => this.saveGame(), 10000);
+                    
+                    // SHOW TUTORIAL AND PAUSE
+                    document.getElementById('tutorial-modal').style.display = 'block';
+                    document.getElementById('ui-layer').style.pointerEvents = 'auto'; // Enable clicks for tutorial
+                    this.togglePause();
+
+                    setInterval(() => {
+                        if(this.gameState === 'PLAY' && !this.paused && Math.random() < 0.3) {
+                            let currentLevel = Math.floor(this.ants.length / 100);
+                            let r = Math.random();
+                            let type = r < 0.5 ? 'raider' : (r < 0.9 ? 'spider' : 'frog');
+                            if (this.ants.length >= 150 && Math.random() < 0.10) {
+                                type = 'lizard';
+                            }
+
+                            let count = type === 'raider' ? Math.floor(rand(2, 11)) : 1; 
+                            
+                            let side = Math.floor(Math.random() * 4);
+                            let startX, startY;
+                            const jitter = 50; 
+
+                            if (side === 0) { 
+                                startX = rand(0, C.MAP_WIDTH);
+                                startY = rand(-jitter, 10); 
+                            } else if (side === 1) { 
+                                startX = rand(C.MAP_WIDTH - 10, C.MAP_WIDTH + jitter);
+                                startY = rand(0, C.MAP_HEIGHT);
+                            } else if (side === 2) { 
+                                startX = rand(0, C.MAP_WIDTH);
+                                startY = rand(C.MAP_HEIGHT - 10, C.MAP_HEIGHT + jitter);
+                            } else { 
+                                startX = rand(-jitter, 10);
+                                startY = rand(0, C.MAP_HEIGHT);
+                            }
+                            
+                            startX = Math.max(-50, Math.min(C.MAP_WIDTH + 50, startX));
+                            startY = Math.max(-50, Math.min(C.MAP_HEIGHT + 50, startY));
+
+                            for(let i=0; i<count; i++) {
+                                let ox = startX + rand(-30, 30); let oy = startY + rand(-30, 30);
+                                this.enemies.push(new Enemy(ox, oy, type, currentLevel));
+                            }
+                            let name = type === 'raider' ? "Skupina Nájezdníků" : (type === 'spider' ? "Pavouk" : (type === 'lizard' ? "Velká Ještěrka" : "Žába"));
+                            
+                            let msg = `Vetřelec: ${name} (Lvl ${currentLevel})`;
+                            this.uiMessage(msg);
+                            this.sfx.playAlert(); // SFX
+                        }
+                    }, 15000);
+                }
+                handleMouseDown(e) {
+                    if (this.paused) {
+                        // Allow tutorial clicks
+                        if(document.getElementById('tutorial-modal').style.display === 'block') return;
+                        // Only return if truly paused and no tutorial (or add logic for tutorial button)
+                        // Actually, if paused, the click event on canvas shouldn't matter much unless it's UI
+                        // But tutorial button is HTML, not canvas.
+                        return;
+                    }
+                    let rect = this.canvas.getBoundingClientRect();
+                    let mx = (e.clientX - rect.left) / this.zoom; 
+                    let my = (e.clientY - rect.top) / this.zoom;
+                    let worldX = mx + this.camX; let worldY = my + this.camY;
+                    
+                    this.isDragging = true; 
+                    this.lastMx = mx; 
+                    this.lastMy = my;
+
+                    if (!this.markingMode) {
+                        let clickedRes = null;
+                        for (let r of this.mapResources) {
+                            if (dist(worldX, worldY, r.x, r.y) < r.radius + 5) { clickedRes = r; break; }
+                        }
+                        this.selectedRes = clickedRes; 
+                    }
+                    
+                    if (this.gameState === 'PLAY' && !this.showNestInterior) {
+                        if (dist(worldX, worldY, this.queen.x, this.queen.y) < 50) {
+                             this.setCamera('QUEEN');
+                             return;
+                        }
+                    }
+
+                    if (this.markingMode) {
+                        if (Date.now() - this.lastMarkTime < 30000) return; 
+                        if (this.resources.sugar >= 25) { 
+                            this.resources.sugar -= 25;
+                            this.markedZone = { x: worldX, y: worldY, radius: 150, active: true, timer: 60 }; 
+                            this.lastMarkTime = Date.now();
+                            this.uiMessage("Oblast označena! (60s)");
+                            this.sfx.playClick();
+                        } else { this.uiMessage("Nedostatek cukrů (potřeba 25)!"); }
+                        this.markingMode = false; this.canvas.style.cursor = 'default'; return;
+                    }
+                    if (this.gameState === 'FOUNDING') {
+                        this.queen.tx = worldX; this.queen.ty = worldY;
+                        if (dist(worldX, worldY, this.queen.x, this.queen.y) < 50) { this.establishColony(); }
+                        else { this.uiMessage("Letím na místo určení..."); }
+                    }
+                }
+                handleMouseMove(e) {
+                    let rect = this.canvas.getBoundingClientRect();
+                    let mx = (e.clientX - rect.left) / this.zoom; 
+                    let my = (e.clientY - rect.top) / this.zoom;
+                    this.mouseX = mx + this.camX; this.mouseY = my + this.camY;
+                    
+                    if (this.isDragging) {
+                        let dx = mx - this.lastMx;
+                        let dy = my - this.lastMy;
+                        
+                        if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+                             if (this.cameraMode !== 'FREE') {
+                                 this.setCamera('FREE');
+                                 this.showNestInterior = false; 
+                             }
+                             this.camX -= dx; 
+                             this.camY -= dy;
+                             this.lastMx = mx; 
+                             this.lastMy = my;
+                        }
+                    }
+                }
+                establishColony() {
+                    this.gameState = 'PLAY'; this.queen.flying = false;
+                    document.getElementById('controls').style.display = 'block';
+                    document.getElementById('brood-panel').style.display = 'block';
+                    document.getElementById('minimap-container').style.display = 'block';
+                    this.uiMessage("Hnízdo založeno! Fáze kolonie.");
+                    this.resources.protein += 30; this.resources.fat += 30;
+                    this.uiMessage("Bonus: Histolýza svalů (+Prot, +Tuky)");
+                    this.sfx.playHatch(); // SFX
+                    let n = Math.floor(rand(1, 8));
+                    
+                    for(let i=0; i<n; i++) {
+                        let bx = this.queen.x + rand(-10,10);
+                        let by = this.queen.y + rand(-10,10);
+                        this.brood.push(new Brood(bx, by, 'NANITIC'));
+                    }
+                    
+                    this.uiMessage(`Nakladeno ${n} vajíček (Nanitici).`);
+                    this.updateHatchButtons();
+                }
+                hatch(type) {
+                    let cost = this.calculateCost(type, this.hatchMultiplier); 
+                    if (this.checkCost(cost)) {
+                        this.payCost(cost);
+                        
+                        // Calculate dynamic nest radius based on population (same formula as in draw)
+                        let nestRadius = 60 + (this.ants.length / 5) + (this.brood.length / 10);
+                        if (nestRadius > 150) nestRadius = 150;
+
+                        // Loop for multiplier
+                        for(let i=0; i<this.hatchMultiplier; i++) {
+                            let angle = Math.random() * Math.PI * 2;
+                            // Spread eggs within the available nest area, keeping a small clear area around queen
+                            let r = (Math.random() * (nestRadius - 20)) + 15;
+                            
+                            let bx = this.queen.x + Math.cos(angle) * r;
+                            let by = this.queen.y + Math.sin(angle) * r;
+                            
+                            this.brood.push(new Brood(bx, by, type));
+                        }
+
+                        this.uiMessage(`${type} - Vajíčko položeno (x${this.hatchMultiplier})`);
+                        this.sfx.playClick();
+                        this.updateHatchButtons();
+                    }
+                }
+                upgradeCaste(type) {
+                    let lvl = this.upgrades[type];
+                    let costP = 50 * (lvl + 1); let costF = 50 * (lvl + 1);
+                    if (this.resources.protein >= costP && this.resources.fat >= costF) {
+                        this.resources.protein -= costP; this.resources.fat -= costF;
+                        this.upgrades[type]++;
+                        this.uiMessage(`${type} vylepšen na lvl ${this.upgrades[type] + 1}`);
+                        if (type === 'QUEEN') {
+                            let multiplier = 1 + (this.upgrades['QUEEN'] * 0.2);
+                            this.queen.maxHp = 1000 * multiplier;
+                            this.queen.hp = this.queen.maxHp; this.queen.dmg = 20 * multiplier;
+                        }
+                        this.sfx.playClick();
+                        this.updateHatchButtons();
+                    } else { this.uiMessage("Nedostatek zdrojů na vylepšení!"); }
+                }
+                checkCost(cost) { return this.resources.water >= cost.w && this.resources.sugar >= cost.s && this.resources.protein >= cost.p && this.resources.fat >= cost.f; }
+                payCost(cost) { this.resources.water -= cost.w; this.resources.sugar -= cost.s; this.resources.protein -= cost.p; this.resources.fat -= cost.f; }
+                updateHatchButtons() {
+                    const hatchContainer = document.getElementById('hatch-buttons');
+                    const broodMsg = document.getElementById('brood-message');
+                    const hatchSection = document.getElementById('brood-section');
+                    const upgradeContainer = document.getElementById('upgrade-buttons');
+                    const upgradeSection = document.getElementById('upgrade-section');
+                    const goalSection = document.getElementById('goal-section'); 
+                    const multiplierContainer = document.getElementById('multiplier-controls');
+
+                    if (this.cameraMode !== 'QUEEN') {
+                        hatchSection.style.display = 'none'; upgradeSection.style.display = 'none'; broodMsg.style.display = 'block';
+                        goalSection.style.display = 'none'; 
+                        return; 
+                    } else {
+                        hatchSection.style.display = 'block'; upgradeSection.style.display = 'block'; broodMsg.style.display = 'none';
+                        goalSection.style.display = 'block'; 
+                    }
+
+                    // Render Multiplier Buttons
+                    if (multiplierContainer.innerHTML === '') {
+                        [1, 2, 3, 5, 10].forEach(m => {
+                            let btn = document.createElement('button');
+                            btn.className = 'multiplier-btn';
+                            btn.innerText = 'x' + m;
+                            btn.onclick = () => this.setHatchMultiplier(m);
+                            multiplierContainer.appendChild(btn);
+                        });
+                    }
+                    // Update active class for multipliers
+                    Array.from(multiplierContainer.children).forEach(btn => {
+                        if (btn.innerText === 'x' + this.hatchMultiplier) btn.classList.add('active');
+                        else btn.classList.remove('active');
+                    });
+
+                    let males = this.ants.filter(a => a.caste === 'MALE').length;
+                    let queens = this.ants.filter(a => a.caste === 'QUEEN_NEW').length;
+                    document.getElementById('win-progress').innerText = `${males} Samců / ${queens} Královen`;
+
+                    let lockedShown = false; 
+                    for (let key in C.CASTE) {
+                        if (key === 'NANITIC') continue;
+                        let c = C.CASTE[key];
+                        let btnId = `btn-hatch-${key}`;
+                        let existingBtn = document.getElementById(btnId);
+
+                        if (this.maxPop >= c.req) {
+                            // Calculate total cost for current multiplier
+                            let currentCost = this.calculateCost(key, this.hatchMultiplier);
+                            if (!existingBtn) {
+                                let btn = document.createElement('button');
+                                btn.id = btnId;
+                                btn.className = 'btn hatch-btn';
+                                btn.onclick = () => this.hatch(key);
+                                btn.onmouseenter = () => this.showTooltip(btn, 'caste', key);
+                                btn.onmouseleave = () => this.hideTooltip();
+                                hatchContainer.appendChild(btn);
+                                existingBtn = btn;
+                                let locked = document.getElementById('btn-hatch-locked');
+                                if(locked) locked.remove();
+                            }
+                            // Update text to show (xMultiplier) and Total Cost
+                            existingBtn.innerHTML = `<span>${c.name} (x${this.hatchMultiplier})</span> <span style="font-size:0.7em; color:#ccc;">💧${currentCost.w} 🍬${currentCost.s} 🥩${currentCost.p} 🌰${currentCost.f}</span>`;
+                            
+                            if (!this.checkCost(currentCost)) { 
+                                existingBtn.disabled = true; existingBtn.style.opacity = 0.5; 
+                            } else { 
+                                existingBtn.disabled = false; existingBtn.style.opacity = 1; 
+                            }
+                        } else if (!lockedShown) {
+                            let lockedId = 'btn-hatch-locked';
+                            let lockedBtn = document.getElementById(lockedId);
+                            if (!lockedBtn) {
+                                lockedBtn = document.createElement('button');
+                                lockedBtn.id = lockedId;
+                                lockedBtn.className = 'btn hatch-btn locked';
+                                lockedBtn.innerHTML = `<span>🔒 ${c.name}</span> <span style="font-size:0.7em;">Cíl: Populace ${c.req}</span>`;
+                                lockedBtn.disabled = true;
+                                hatchContainer.appendChild(lockedBtn);
+                            } else {
+                                lockedBtn.innerHTML = `<span>🔒 ${c.name}</span> <span style="font-size:0.7em;">Cíl: Populace ${c.req}</span>`;
+                            }
+                            lockedShown = true; 
+                        }
+                    }
+                    
+                    let qBtnId = 'btn-upgrade-QUEEN';
+                    let qBtn = document.getElementById(qBtnId);
+                    let qLvl = this.upgrades['QUEEN'];
+                    let qCost = 50 * (qLvl + 1);
+                    if (!qBtn) {
+                        qBtn = document.createElement('button');
+                        qBtn.id = qBtnId;
+                        qBtn.className = 'btn upgrade-btn';
+                        qBtn.onclick = () => this.upgradeCaste('QUEEN');
+                        qBtn.onmouseenter = () => this.showTooltip(qBtn, 'upgrade', 'QUEEN');
+                        qBtn.onmouseleave = () => this.hideTooltip();
+                        upgradeContainer.appendChild(qBtn);
+                    }
+                    qBtn.innerHTML = `<span>👑 Královna (Lvl ${qLvl})</span> <span style="font-size:0.7em; color:#e67e22;">🥩${qCost} 🌰${qCost}</span>`;
+                    if (this.resources.protein < qCost || this.resources.fat < qCost) { qBtn.disabled = true; qBtn.style.opacity = 0.5; } 
+                    else { qBtn.disabled = false; qBtn.style.opacity = 1; }
+
+                    for (let key in C.CASTE) {
+                        if (key === 'NANITIC') continue;
+                        if (this.maxPop >= C.CASTE[key].req) {
+                             let uBtnId = `btn-upgrade-${key}`;
+                             let uBtn = document.getElementById(uBtnId);
+                             let lvl = this.upgrades[key];
+                             let cost = 50 * (lvl + 1);
+                             if (!uBtn) {
+                                 uBtn = document.createElement('button');
+                                 uBtn.id = uBtnId;
+                                 uBtn.className = 'btn upgrade-btn';
+                                 uBtn.onclick = () => this.upgradeCaste(key);
+                                 uBtn.onmouseenter = () => this.showTooltip(uBtn, 'upgrade', key);
+                                 uBtn.onmouseleave = () => this.hideTooltip();
+                                 upgradeContainer.appendChild(uBtn);
+                             }
+                             uBtn.innerHTML = `<span>${C.CASTE[key].name} (Lvl ${lvl})</span> <span style="font-size:0.7em; color:#e67e22;">🥩${cost} 🌰${cost}</span>`;
+                             if (this.resources.protein < cost || this.resources.fat < cost) { uBtn.disabled = true; uBtn.style.opacity = 0.5; } 
+                             else { uBtn.disabled = false; uBtn.style.opacity = 1; }
+                        }
+                    }
+                }
+                
+                uiMessage(text) {
+                    let time = new Date().toLocaleTimeString([], { hour12: false });
+                    this.fullHistory.push({time: time, text: text});
+
+                    if (this.msgQueue.length > 0) {
+                        let lastMsg = this.msgQueue[this.msgQueue.length - 1];
+                        if (lastMsg.rawText === text) {
+                            lastMsg.count++;
+                            this.renderMessages(); 
+                            return; 
+                        }
+                    }
+
+                    this.msgQueue.push({ rawText: text, count: 1 });
+                    if (this.msgQueue.length > 3) this.msgQueue.shift();
+                    
+                    this.renderMessages();
+
+                    setTimeout(() => {
+                        if(this.msgQueue.length > 0) {
+                            this.msgQueue.shift();
+                            this.renderMessages();
+                        }
+                    }, 5000);
+                }
+
+                renderMessages() {
+                    const b = document.getElementById('bubble-text');
+                    if(this.msgQueue.length === 0) {
+                        b.innerHTML = '<div class="msg-line" style="font-style:italic; color:#aaa;">Královna odpočívá...</div>';
+                        return;
+                    }
+                    b.innerHTML = this.msgQueue.map((msg, i) => {
+                        let style = i === this.msgQueue.length - 1 ? "font-weight:bold; opacity:1;" : "opacity:0.7;";
+                        let display = msg.count > 1 ? `${msg.rawText} x${msg.count}` : msg.rawText;
+                        return `<div class="msg-line" style="${style}">${display}</div>`;
+                    }).join('');
+                }
+
+                reportDeath(ant, cause) {
+                    this.uiMessage(`${ant.caste} zemřel: ${cause}`);
+                }
+
+                showWinScreen() {
+                    this.gameState = 'WIN'; 
+                    this.createConfetti();
+                    
+                    let timeSurvived = Math.floor((Date.now() - this.startTime) / 1000);
+                    let m = Math.floor(timeSurvived / 60);
+                    let s = timeSurvived % 60;
+                    let timeStr = `${m}m ${s}s`;
+
+                    const hierarchy = ['QUEEN_NEW', 'SOLDIER', 'MAJOR', 'MEDIA', 'MINOR', 'NANITIC'];
+                    let bestCaste = 'Žádná';
+                    if (this.ants.length > 0) {
+                        for (let type of hierarchy) {
+                            if (this.ants.some(a => a.caste === type)) {
+                                bestCaste = C.CASTE[type].name;
+                                break;
+                            }
+                        }
+                        if (bestCaste === 'Žádná' && this.ants.length > 0) bestCaste = 'Nanitic';
+                    }
+
+                    let container = document.getElementById('win-stats');
+                    container.innerHTML = `
+                        <div class="end-stat">Doba hry: ${timeStr}</div>
+                        <div class="end-stat">Max Populace: ${this.maxPop}</div>
+                        <div class="end-stat">Nejlepší kasta: ${bestCaste}</div>
+                        <div class="end-stat">Max Samců: ${this.maxMales}</div>
+                        <div class="end-stat">Max Královen: ${this.maxQueens}</div>
+                    `;
+                    
+                    document.getElementById('win-screen').style.display = 'flex';
+                    document.getElementById('ui-layer').style.pointerEvents = 'auto';
+                }
+
+                update(dt) {
+                    if (this.paused) return; 
+                    this.frameCount++;
+                    
+                    // === NORMALIZACE POHYBU PODLE FPS ===
+                    // Násobič pohybu: pokud běží hra na 60FPS (dt cca 0.016s), scale je 1.0
+                    // Pokud běží na 30FPS (dt 0.032s), scale je 2.0 (pohybují se 2x rychleji za frame)
+                    const timeScale = dt * 60; 
+
+                    if (this.gameState === 'PLAY') {
+                        if (this.ants.length > this.maxPop) { this.maxPop = this.ants.length; this.updateHatchButtons(); }
+                        if (this.markedZone && this.markedZone.active) {
+                            if (this.behavior !== 'DEFEND') {
+                                this.markedZone.timer -= dt;
+                            }
+                            let hasResources = this.mapResources.some(r => !r.dead && dist(r.x, r.y, this.markedZone.x, this.markedZone.y) < this.markedZone.radius);
+                            if (!hasResources) {
+                                this.markedZone.active = false;
+                                this.uiMessage("Zóna vytěžena! Značka zrušena.");
+                            } else if (this.markedZone.timer <= 0) { 
+                                this.markedZone.active = false; 
+                                this.uiMessage("Účinek označení vypršel."); 
+                            }
+                        }
+                        let btnMark = document.getElementById('btn-mark');
+                        let cd = 30000 - (Date.now() - this.lastMarkTime); 
+                        if (cd > 0) {
+                            btnMark.disabled = true; btnMark.innerText = `Označit oblast (${Math.ceil(cd/1000)}s)`; btnMark.style.opacity = 0.5;
+                        } else {
+                            btnMark.disabled = false; btnMark.innerText = `Označit oblast (25 🍬)`; btnMark.style.opacity = 1;
+                        }
+                        let males = this.ants.filter(a => a.caste === 'MALE').length;
+                        let queens = this.ants.filter(a => a.caste === 'QUEEN_NEW').length;
+                        if (males > this.maxMales) this.maxMales = males;
+                        if (queens > this.maxQueens) this.maxQueens = queens;
+                        if (males >= 30 && queens >= 15 && males >= queens * 2) {
+                            this.showWinScreen();
+                        }
+                        this.queen.age += dt;
+                        if (Math.random() < 0.01) this.resources.water -= 0.1; 
+                        if (Math.random() < 0.005) this.resources.sugar -= 0.1; 
+                        if (this.resources.water <= 0) {
+                            this.resources.water = 0; this.queen.hp -= 0.1;
+                            if(Math.random() < 0.05) this.uiMessage("Královna má žízeň!");
+                        }
+                        
+                        let totalCap = 100;
+                        
+                        this.ants.forEach(ant => {
+                             let cStats = C.CASTE[ant.caste];
+                             if (cStats.cap) totalCap += cStats.cap;
+                             
+                             if (ant.caste === 'MALE' || ant.caste === 'QUEEN_NEW') {
+                                 if (Math.random() < 0.05) { 
+                                     this.resources.water -= 0.01;
+                                     this.resources.sugar -= 0.01;
+                                     this.resources.protein -= 0.01;
+                                     this.resources.fat -= 0.01;
+                                 }
+                             }
+                        });
+
+                        ['water','sugar','protein','fat'].forEach(r => { 
+                            this.caps[r] = totalCap; 
+                            if (this.resources[r] > this.caps[r]) this.resources[r] = this.caps[r];
+                            if (this.resources[r] < 0) this.resources[r] = 0; 
+                        });
+
+                        let starving = false;
+                        ['water','sugar','protein','fat'].forEach(r => {
+                            if (this.resources[r] < this.caps[r] * 0.01) {
+                                this.queen.hp -= 1 * dt; 
+                                starving = true;
+                            }
+                        });
+                        if (starving && Math.random() < 0.01) {
+                             this.uiMessage("Královna hladoví! (Nízké zdroje)");
+                        }
+
+                        this.queenFighting = false;
+                        let qEnemies = this.enemies.filter(e => !e.dead && dist(this.queen.x, this.queen.y, e.x, e.y) < 60);
+                        if (qEnemies.length > 0) {
+                            this.queenFighting = true;
+                            qEnemies.forEach(e => { e.hp -= (this.queen.dmg * dt); });
+                            if(Math.random() < 0.1) this.sfx.playAttack(); // SFX
+                        }
+                    }
+                    if (this.gameState === 'FOUNDING' && this.queen.tx) {
+                        let angle = Math.atan2(this.queen.ty - this.queen.y, this.queen.tx - this.queen.x);
+                        let distToTarget = dist(this.queen.x, this.queen.y, this.queen.tx, this.queen.ty);
+                        if (distToTarget > 5) {
+                            this.queen.x += Math.cos(angle) * 3 * timeScale; 
+                            this.queen.y += Math.sin(angle) * 3 * timeScale;
+                            this.resources.water -= 0.02; this.resources.sugar -= 0.02;
+                            if (Math.random() < 0.05 && this.resources.water < 10) this.uiMessage("Pozor! Dochází voda!");
+                        } else { this.queen.tx = null; }
+                    }
+                    
+                    if (this.frameCount % 4 === 0) {
+                        this.fogCtx.globalCompositeOperation = 'destination-out';
+                        this.fogCtx.beginPath(); this.fogCtx.arc(this.queen.x, this.queen.y, C.VIEW_DIST, 0, Math.PI*2); this.fogCtx.fill();
+                        this.ants.forEach(a => {
+                            if (a.x < -100 || a.x > C.MAP_WIDTH+100 || a.y < -100 || a.y > C.MAP_HEIGHT+100) return;
+                            this.fogCtx.beginPath(); this.fogCtx.arc(a.x, a.y, C.ANT_VIEW, 0, Math.PI*2); this.fogCtx.fill();
+                        });
+                        this.fogCtx.globalCompositeOperation = 'source-over';
+                    }
+
+                    this.brood = this.brood.filter(b => !b.dead);
+                    this.brood.forEach(b => b.update(dt, this));
+
+                    if (this.queen.hp <= 0 || (this.queen.age > this.queen.maxAge)) {
+                        this.gameOver(this.queen.hp <= 0 ? "Vyčerpání/Zranění" : "Stáří"); return;
+                    }
+                    this.ants = this.ants.filter(a => !a.dead);
+                    this.ants.forEach(a => a.update(this, this.frameCount, timeScale)); 
+                    this.enemies = this.enemies.filter(e => !e.dead);
+                    this.enemies.forEach(e => {
+                        e.update(this.ants, this.queen, this, timeScale);
+                        if(e.hp <= 0 && !e.looted) {
+                             e.looted = true;
+                             let type = Object.values(C.RES)[Math.floor(Math.random() * 4)];
+                             let amt = e.baseLoot * rand(0.8, 1.2) * (e.lootMult || 1); 
+                             this.resources[type] += amt;
+                             this.uiMessage(`Kořist (${e.name}): +${Math.floor(amt)} ${type}`);
+                        }
+                    });
+                    this.mapResources = this.mapResources.filter(r => !r.dead);
+                    if (Math.random() < 0.01 && this.mapResources.length < 100) {
+                         let type = Object.values(C.RES)[Math.floor(Math.random() * 4)];
+                         let currentLevel = Math.floor(this.ants.length / 100);
+                         let amountMult = 1 + (currentLevel * 0.30);
+                         this.mapResources.push(new Resource(rand(0, C.MAP_WIDTH), rand(0, C.MAP_HEIGHT), type, rand(20, 80) * amountMult));
+                    }
+                    if (Math.random() < 0.1) { 
+                        document.getElementById('bar-water').style.width = (this.resources.water / this.caps.water * 100) + '%';
+                        document.getElementById('bar-sugar').style.width = (this.resources.sugar / this.caps.sugar * 100) + '%';
+                        document.getElementById('bar-protein').style.width = (this.resources.protein / this.caps.protein * 100) + '%';
+                        document.getElementById('bar-fat').style.width = (this.resources.fat / this.caps.fat * 100) + '%';
+                        document.getElementById('bar-queen').style.width = (this.queen.hp / this.queen.maxHp * 100) + '%';
+                        document.getElementById('pop-count').innerText = this.ants.length;
+                        
+                        let currentLevel = Math.floor(this.ants.length / 100);
+                        document.getElementById('difficulty-lvl').innerText = `Lvl ${currentLevel}`;
+
+                        document.getElementById('val-water').innerText = Math.floor(this.resources.water);
+                        document.getElementById('val-sugar').innerText = Math.floor(this.resources.sugar);
+                        document.getElementById('val-protein').innerText = Math.floor(this.resources.protein);
+                        document.getElementById('val-fat').innerText = Math.floor(this.resources.fat);
+                        document.getElementById('val-queen').innerText = Math.floor(this.queen.hp);
+                        
+                        let timeLeft = Math.max(0, this.queen.maxAge - this.queen.age);
+                        document.getElementById('val-time').innerText = `${Math.ceil(timeLeft/60)}m`;
+                        
+                        this.updateHatchButtons();
+                    }
+                    let targetX = this.camX; let targetY = this.camY;
+                    
+                    let effectiveW = this.canvas.width / this.zoom;
+                    let effectiveH = this.canvas.height / this.zoom;
+
+                    if (this.cameraMode === 'QUEEN') { 
+                        targetX = this.queen.x - effectiveW / 2; 
+                        targetY = this.queen.y - effectiveH / 2; 
+                    }
+                    else if (this.cameraMode === 'ANT') {
+                        if (this.ants[this.followedAntIndex]) { 
+                            targetX = this.ants[this.followedAntIndex].x - effectiveW / 2; 
+                            targetY = this.ants[this.followedAntIndex].y - effectiveH / 2; 
+                        }
+                        else { this.setCamera('QUEEN'); }
+                    }
+                    if (this.cameraMode !== 'FREE') {
+                        this.camX += (targetX - this.camX) * 0.1;
+                        this.camY += (targetY - this.camY) * 0.1;
+                    }
+                    
+                    this.camX = Math.max(0, Math.min(this.camX, C.MAP_WIDTH - effectiveW));
+                    this.camY = Math.max(0, Math.min(this.camY, C.MAP_HEIGHT - effectiveH));
+                }
+
+                createConfetti() {
+                    for(let i=0; i<100; i++) {
+                        let c = document.createElement('div');
+                        c.className = 'confetti';
+                        c.style.left = Math.random() * 100 + 'vw';
+                        c.style.background = `hsl(${Math.random()*360}, 100%, 50%)`;
+                        c.style.animationDuration = (Math.random()*3+2)+'s';
+                        document.body.appendChild(c);
+                    }
+                }
+
+                draw() {
+                    this.ctx.fillStyle = this.biome === 'meadow' ? '#2ecc71' : '#f1c40f';
+                    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                    
+                    this.ctx.save();
+                    
+                    this.ctx.scale(this.zoom, this.zoom);
+                    this.ctx.translate(-this.camX, -this.camY);
+
+                    const viewX = this.camX;
+                    const viewY = this.camY;
+                    const viewW = this.canvas.width / this.zoom;
+                    const viewH = this.canvas.height / this.zoom;
+                    const pad = 100; 
+                    
+                    this.ctx.fillStyle = this.biome === 'meadow' ? '#27ae60' : '#d35400';
+                    this.ctx.globalAlpha = 0.2;
+                    for(let i=0; i<20; i++) {
+                        this.ctx.beginPath(); this.ctx.arc((i * 137)%C.MAP_WIDTH, (i * 993)%C.MAP_HEIGHT, 50, 0, Math.PI*2); this.ctx.fill();
+                    }
+                    this.ctx.globalAlpha = 1;
+                    if (this.markedZone && this.markedZone.active) {
+                        this.ctx.save();
+                        this.ctx.fillStyle = 'rgba(231, 76, 60, 0.2)';
+                        this.ctx.strokeStyle = '#e74c3c';
+                        this.ctx.setLineDash([5, 5]);
+                        this.ctx.beginPath();
+                        this.ctx.arc(this.markedZone.x, this.markedZone.y, this.markedZone.radius, 0, Math.PI*2);
+                        this.ctx.fill();
+                        this.ctx.stroke();
+                        this.ctx.restore();
+                    }
+                    if (this.markingMode) {
+                        this.ctx.save();
+                        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                        this.ctx.setLineDash([5, 5]);
+                        this.ctx.beginPath();
+                        this.ctx.arc(this.mouseX, this.mouseY, 150, 0, Math.PI*2);
+                        this.ctx.stroke();
+                        this.ctx.restore();
+                    }
+                    this.mapResources.forEach(r => {
+                        if (r.x < viewX - pad || r.x > viewX + viewW + pad || r.y < viewY - pad || r.y > viewY + viewH + pad) return;
+
+                        this.ctx.beginPath();
+                        this.ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2);
+                        switch(r.type) {
+                            case 'water': this.ctx.fillStyle = '#3498db'; break;
+                            case 'sugar': this.ctx.fillStyle = '#f1c40f'; break; 
+                            case 'protein': this.ctx.fillStyle = '#c0392b'; break;
+                            case 'fat': this.ctx.fillStyle = '#e67e22'; break;
+                        }
+                        this.ctx.fill();
+                        this.ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+                        this.ctx.stroke();
+                        if (this.selectedRes === r) {
+                             this.ctx.font = '12px sans-serif';
+                             let text = `${Math.floor(r.amount)}/${Math.floor(r.maxAmount)}`;
+                             this.ctx.strokeStyle = 'black'; this.ctx.lineWidth = 3;
+                             this.ctx.strokeText(text, r.x - 15, r.y - 15);
+                             this.ctx.fillStyle = 'white'; this.ctx.fillText(text, r.x - 15, r.y - 15);
+                             this.ctx.strokeStyle = 'white'; this.ctx.lineWidth = 2; this.ctx.stroke(); 
+                        }
+                    });
+                    
+                    if (this.gameState !== 'FOUNDING') {
+                        if (this.showNestInterior) {
+                            this.ctx.fillStyle = '#2c3e50';
+                            let nestRadius = 60 + (this.ants.length / 5) + (this.brood.length / 10);
+                            if (nestRadius > 150) nestRadius = 150;
+
+                            this.ctx.beginPath(); this.ctx.arc(this.queen.x, this.queen.y, nestRadius, 0, Math.PI*2); 
+                            this.ctx.fill(); this.ctx.strokeStyle = '#000'; this.ctx.lineWidth = 3; this.ctx.stroke();
+                        } else {
+                            this.ctx.fillStyle = 'rgba(0,0,0,0.8)';
+                            this.ctx.beginPath(); 
+                            this.ctx.ellipse(this.queen.x, this.queen.y, 40, 25, 0, 0, Math.PI*2);
+                            this.ctx.fill();
+                            this.ctx.strokeStyle = '#333';
+                            this.ctx.lineWidth = 2;
+                            this.ctx.stroke();
+                            
+                            this.ctx.fillStyle = '#aaa';
+                            this.ctx.font = '10px sans-serif';
+                            this.ctx.textAlign = 'center';
+                            this.ctx.fillText("HNÍZDO", this.queen.x, this.queen.y + 4);
+                        }
+                    }
+
+                    if (this.showNestInterior) {
+                        this.brood.forEach(b => b.draw(this.ctx));
+                    }
+
+                    this.ants.forEach(a => {
+                        if (a.x < viewX - pad || a.x > viewX + viewW + pad || a.y < viewY - pad || a.y > viewY + viewH + pad) return;
+                        this.drawAnt(a);
+                    });
+                    
+                    this.enemies.forEach(e => {
+                        if (e.x < viewX - pad || e.x > viewX + viewW + pad || e.y < viewY - pad || e.y > viewY + viewH + pad) return;
+                        this.drawEnemy(e);
+                    });
+                    
+                    if (this.showNestInterior || this.gameState === 'FOUNDING') {
+                        this.drawQueen();
+                    }
+                    
+                    this.ctx.drawImage(this.fogCanvas, viewX, viewY, viewW, viewH, viewX, viewY, viewW, viewH);
+
+                    this.ctx.restore();
+                    if (this.gameState === 'PLAY' || this.gameState === 'WIN') this.drawMinimap();
+                }
+
+                drawMinimap() {
+                    const ctx = this.minimapCtx;
+                    const w = this.minimapCanvas.width; const h = this.minimapCanvas.height;
+                    ctx.fillStyle = '#222'; ctx.fillRect(0, 0, w, h);
+                    this.mapResources.forEach(r => {
+                        ctx.fillStyle = r.type==='sugar'?'#f1c40f':this.getResourceColor(r.type); 
+                        ctx.beginPath(); ctx.arc(r.x, r.y, r.radius * 2, 0, Math.PI*2); ctx.fill();
+                    });
+                    ctx.fillStyle = '#fff';
+                    this.ants.forEach(a => { ctx.fillRect(a.x-5, a.y-5, 10, 10); });
+                    
+                    ctx.fillStyle = '#d2691e';
+                    ctx.beginPath(); ctx.arc(this.queen.x, this.queen.y, 30, 0, Math.PI*2); ctx.fill();
+                    
+                    ctx.drawImage(this.fogCanvas, 0, 0, C.MAP_WIDTH, C.MAP_HEIGHT, 0, 0, w, h);
+                    ctx.strokeStyle = '#fff'; ctx.lineWidth = 5;
+                    
+                    let effectiveW = this.canvas.width / this.zoom;
+                    let effectiveH = this.canvas.height / this.zoom;
+
+                    let miniCamX = (this.camX / C.MAP_WIDTH) * w; 
+                    let miniCamY = (this.camY / C.MAP_HEIGHT) * h;
+                    let miniCamW = (effectiveW / C.MAP_WIDTH) * w; 
+                    let miniCamH = (effectiveH / C.MAP_HEIGHT) * h;
+                    ctx.strokeRect(miniCamX, miniCamY, miniCamW, miniCamH);
+                }
+
+                drawAnt(ant) {
+                    this.ctx.save(); this.ctx.translate(ant.x, ant.y);
+                    if (ant.hp < ant.maxHp) {
+                        this.ctx.fillStyle = 'red'; this.ctx.fillRect(-5, -10, 10, 2);
+                        this.ctx.fillStyle = '#0f0'; this.ctx.fillRect(-5, -10, 10 * (ant.hp/ant.maxHp), 2);
+                    }
+                    if (this.showStatusText) {
+                        this.ctx.save(); this.ctx.rotate(-this.angle);
+                        this.ctx.fillStyle = 'white'; this.ctx.font = '9px Arial';
+                        this.ctx.textAlign = 'center'; 
+                        this.ctx.fillText(ant.getLabel(this.useEmojiStatus), 0, -15);
+                        this.ctx.restore();
+                    }
+                    this.ctx.rotate(ant.angle);
+                    this.ctx.fillStyle = ant.color;
+                    this.ctx.beginPath(); this.ctx.ellipse(-ant.size, 0, ant.size, ant.size*0.7, 0, 0, Math.PI*2); this.ctx.fill();
+                    this.ctx.beginPath(); this.ctx.ellipse(0, 0, ant.size*0.6, ant.size*0.4, 0, 0, Math.PI*2); this.ctx.fill();
+                    this.ctx.beginPath(); 
+                    let headSize = ant.caste === 'SOLDIER' || ant.caste === 'MAJOR' ? ant.size * 1.2 : ant.size * 0.8;
+                    this.ctx.ellipse(ant.size*0.8, 0, headSize, headSize*0.9, 0, 0, Math.PI*2); this.ctx.fill();
+                    if(ant.carrying) {
+                        this.ctx.fillStyle = ant.carrying==='sugar'?'#f1c40f':this.getResourceColor(ant.carrying);
+                        this.ctx.beginPath(); this.ctx.arc(ant.size + 5, 0, 3, 0, Math.PI*2); this.ctx.fill();
+                    }
+                    this.ctx.restore();
+                }
+
+                drawEnemy(enemy) {
+                    this.ctx.save(); this.ctx.translate(enemy.x, enemy.y);
+                    
+                    let barY = -20;
+                    if (enemy.type === 'frog') barY = -45; 
+                    if (enemy.type === 'lizard') barY = -65;
+
+                    this.ctx.fillStyle = 'red'; this.ctx.fillRect(-10, barY, 20, 4);
+                    this.ctx.fillStyle = '#0f0'; this.ctx.fillRect(-10, barY, 20 * (enemy.hp / enemy.maxHp), 4);
+                    
+                    this.ctx.rotate(enemy.angle);
+                    
+                    if (enemy.type === 'frog') {
+                        this.ctx.rotate(Math.PI / 2 + Math.PI);
+                        if (this.frogImg.complete) {
+                             this.ctx.drawImage(this.frogImg, -33.5, -28, 67, 56);
+                        } else {
+                             this.ctx.fillStyle = 'green'; this.ctx.beginPath(); this.ctx.arc(0,0,28,0,Math.PI*2); this.ctx.fill();
+                        }
+                    } 
+                    else if (enemy.type === 'spider') {
+                        this.ctx.rotate(Math.PI / 2); 
+                        if (this.spiderImg.complete) {
+                            this.ctx.drawImage(this.spiderImg, -25, -25, 50, 50); 
+                        } else {
+                            this.ctx.fillStyle = '#000';
+                            this.ctx.beginPath(); this.ctx.arc(0, 0, 12, 0, Math.PI*2); this.ctx.fill();
+                        }
+                    } 
+                    else if (enemy.type === 'lizard') {
+                        this.ctx.rotate(Math.PI / 2); 
+                        if (this.lizardImg.complete) {
+                             this.ctx.drawImage(this.lizardImg, -32, -60, 64, 120);
+                        } else {
+                            this.ctx.fillStyle = '#8e44ad'; 
+                            this.ctx.beginPath(); this.ctx.ellipse(0, 0, 32.5, 10.4, 0, 0, Math.PI*2); this.ctx.fill();
+                        }
+                    } 
+                    else {
+                        this.ctx.rotate(Math.PI / 2);
+                        if (this.raiderImg.complete) {
+                             this.ctx.drawImage(this.raiderImg, -7, -17.5, 20, 30);
+                        } else {
+                            this.ctx.fillStyle = '#333'; 
+                            this.ctx.beginPath(); this.ctx.ellipse(0, 0, 17.5, 7, 0, 0, Math.PI*2); this.ctx.fill();
+                        }
+                    }
+                    this.ctx.restore();
+                }
+
+                drawQueen() {
+                    this.ctx.save(); this.ctx.translate(this.queen.x, this.queen.y);
+                    if (this.queen.hp < this.queen.maxHp) {
+                         this.ctx.fillStyle = 'red'; this.ctx.fillRect(-15, -25, 30, 4);
+                         this.ctx.fillStyle = '#9b59b6'; this.ctx.fillRect(-15, -25, 30 * (this.queen.hp/this.queen.maxHp), 4);
+                    }
+                    if (this.queenFighting) {
+                        this.ctx.fillStyle = 'red'; this.ctx.font = 'bold 12px sans-serif'; this.ctx.fillText("Bojuji!", -20, -35);
+                    }
+                    if (this.gameState === 'FOUNDING') {
+                        let angle = Math.atan2(this.queen.ty - this.queen.y, this.queen.tx - this.queen.x);
+                        this.ctx.rotate(angle);
+                    }
+                    this.ctx.fillStyle = '#d2691e'; 
+                    this.ctx.beginPath(); this.ctx.ellipse(-15, 0, 15, 10, 0, 0, Math.PI*2); this.ctx.fill();
+                    this.ctx.beginPath(); this.ctx.ellipse(5, 0, 10, 8, 0, 0, Math.PI*2); this.ctx.fill();
+                    this.ctx.beginPath(); this.ctx.ellipse(20, 0, 8, 7, 0, 0, Math.PI*2); this.ctx.fill();
+                    if (this.queen.flying) {
+                        this.ctx.fillStyle = 'rgba(255,255,255,0.6)';
+                        this.ctx.beginPath(); this.ctx.ellipse(5, -10, 20, 5, 0.5, 0, Math.PI*2); this.ctx.fill();
+                        this.ctx.beginPath(); this.ctx.ellipse(5, 10, 20, 5, -0.5, 0, Math.PI*2); this.ctx.fill();
+                    }
+                    this.ctx.restore();
+                }
+
+                getResourceColor(type) {
+                    switch(type) {
+                        case 'water': return '#3498db';
+                        case 'sugar': return '#f1c40f';
+                        case 'protein': return '#e74c3c';
+                        case 'fat': return '#e67e22';
+                        default: return '#fff';
+                    }
+                }
+
+                gameOver(reason) {
+                    if (this.isGameOver) return;
+                    this.isGameOver = true;
+                    this.gameState = 'GAMEOVER';
+                    this.sfx.playDeath(); // SFX
+                    document.getElementById('ui-layer').style.pointerEvents = 'auto';
+                    let timeSurvived = Math.floor((Date.now() - this.startTime) / 1000);
+                    let m = Math.floor(timeSurvived / 60);
+                    let s = timeSurvived % 60;
+                    let timeStr = `${m}m ${s}s`;
+
+                    const hierarchy = ['QUEEN_NEW', 'SOLDIER', 'MAJOR', 'MEDIA', 'MINOR', 'NANITIC'];
+                    let bestCaste = 'Žádná';
+                    if (this.ants.length > 0) {
+                        for (let type of hierarchy) {
+                            if (this.ants.some(a => a.caste === type)) {
+                                bestCaste = C.CASTE[type].name;
+                                break;
+                            }
+                        }
+                        if (bestCaste === 'Žádná' && this.ants.length > 0) bestCaste = 'Nanitic';
+                    }
+
+                    let container = document.getElementById('final-stats');
+                    container.innerHTML = `
+                        <div class="end-stat">Doba přežití: ${timeStr}</div>
+                        <div class="end-stat">Max Populace: ${this.maxPop}</div>
+                        <div class="end-stat">Nejlepší kasta: ${bestCaste}</div>
+                        <div class="end-stat">Max Samců: ${this.maxMales}</div>
+                        <div class="end-stat">Max Královen: ${this.maxQueens}</div>
+                        <div class="end-stat" style="margin-top:10px; color:#aaa;">Důvod úhynu: ${reason}</div>
+                    `;
+                    document.getElementById('game-over-screen').style.display = 'flex';
+                }
+
+                saveGame() {
+                    if (this.gameState === 'PLAY') {
+                        const data = { 
+                            resources: this.resources, 
+                            ants: this.ants.map(a => ({x:a.x, y:a.y, type:a.caste, hp:a.hp})), 
+                            queen: this.queen, 
+                            biome: this.biome, 
+                            maxPop: this.maxPop, 
+                            maxMales: this.maxMales, 
+                            maxQueens: this.maxQueens, 
+                            upgrades: this.upgrades,
+                            brood: this.brood.map(b => ({x:b.x, y:b.y, type:b.type, age:b.age})) 
+                        };
+                        localStorage.setItem('antSimSave', JSON.stringify(data));
+                    }
+                }
+
+                load() {
+                    this.sfx.init(); // SFX Init on load
+                    const dataStr = localStorage.getItem('antSimSave');
+                    if (!dataStr) { alert("Žádná uložená hra nenalezena!"); return; }
+                    const data = JSON.parse(dataStr);
+                    this.biome = data.biome; this.resources = data.resources; this.queen = data.queen; 
+                    this.maxPop = data.maxPop || 0;
+                    this.maxMales = data.maxMales || 0;
+                    this.maxQueens = data.maxQueens || 0;
+
+                    this.upgrades = data.upgrades || {};
+                    if (!this.upgrades['QUEEN']) this.upgrades['QUEEN'] = 0;
+                    
+                    this.gameState = 'PLAY'; this.startTime = Date.now(); 
+                    this.isGameOver = false;
+                    this.paused = false;
+                    this.initMap(this.biome); 
+                    
+                    this.playMusic(this.biome);
+
+                    this.ants = [];
+                    data.ants.forEach(ad => { let a = new Ant(ad.x, ad.y, ad.type, this.upgrades[ad.type] || 0); a.hp = ad.hp; this.ants.push(a); });
+                    
+                    if(data.brood) {
+                        data.brood.forEach(bd => {
+                            let b = new Brood(bd.x, bd.y, bd.type);
+                            b.age = bd.age;
+                            this.brood.push(b);
+                        });
+                    }
+
+                    document.getElementById('menu-overlay').style.display = 'none';
+                    document.getElementById('ui-layer').style.pointerEvents = 'none';
+                    document.getElementById('stats-bar').style.display = 'flex';
+                    document.getElementById('queen-speech').style.display = 'flex';
+                    document.getElementById('camera-controls').style.display = 'block';
+                    document.getElementById('minimap-container').style.display = 'block';
+                    document.getElementById('controls').style.display = 'block';
+                    document.getElementById('brood-panel').style.display = 'block';
+                    
+                    this.setCamera('QUEEN');
+                    this.uiMessage("Hra načtena!");
+                    this.rafId = requestAnimationFrame((t) => this.loop(t));
+                    setInterval(() => this.saveGame(), 10000);
+                }
+
+                loop(timestamp, isBackground = false) {
+                    if (!isBackground) {
+                        // Standard loop calculation using timestamp from rAF
+                        let dt = (timestamp - this.lastTime) / 1000;
+                        this.lastTime = timestamp;
+                        if (dt > 0.1) dt = 0.1; // Cap dt to avoid spiraling
+                        this.update(dt);
+                        this.draw();
+                        if (this.gameState !== 'GAMEOVER' && this.gameState !== 'WIN') {
+                            this.rafId = requestAnimationFrame((t) => this.loop(t));
+                        }
+                    } else {
+                        // Background fixed loop (no draw call, fixed dt)
+                        this.update(0.016); // ~60 FPS update
+                        // No draw() call to save resources and because canvas is hidden
+                    }
+                }
+            }
+            window.game = new Game();
+        })();
+    </script>
+</body>
+</html>
